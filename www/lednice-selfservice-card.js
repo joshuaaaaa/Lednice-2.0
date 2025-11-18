@@ -320,7 +320,7 @@ class LedniceSelfServiceCard extends HTMLElement {
     }
 
     console.warn(`🌐 Calling Home Assistant service: lednice.verify_pin with PIN: ${this._pin}`);
-    
+
     try {
       // Show loading state
       const errorEl = this.content.querySelector('#pin-error');
@@ -328,17 +328,22 @@ class LedniceSelfServiceCard extends HTMLElement {
         errorEl.textContent = '⏳ Ověřuji na serveru...';
         errorEl.style.color = 'var(--primary-color)';
       }
-      
-      // Call Home Assistant service - server will send event back
-      await this._hass.callService('lednice', 'verify_pin', {
+
+      // Call Home Assistant service - get response directly
+      const response = await this._hass.callService('lednice', 'verify_pin', {
         pin: this._pin
-      });
-      
-      console.warn('📡 Service call sent - waiting for server event...');
-      
-      // The response will come via event listener (_handlePinVerificationEvent)
-      // We don't do anything here - just wait for the event
-      
+      }, { return_response: true });
+
+      console.warn('📡 Service response received:', response);
+
+      // Process response immediately (faster than waiting for event)
+      if (response && response.response) {
+        this._handlePinVerificationEvent(response.response);
+      } else {
+        console.warn('⚠️ No response data, falling back to event listener');
+        // Event listener will handle it
+      }
+
     } catch (err) {
       console.error('❌ Service call failed:', err);
       const errorEl = this.content.querySelector('#pin-error');

@@ -424,7 +424,7 @@ async def async_setup_services(hass: HomeAssistant, coordinator: "LedniceDataCoo
         schema=vol.Schema({
             vol.Required(ATTR_PIN): cv.string,
         }),
-        supports_response=SupportsResponse.ONLY
+        supports_response=SupportsResponse.OPTIONAL
     )
 
 
