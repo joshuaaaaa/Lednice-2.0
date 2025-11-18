@@ -7,7 +7,7 @@ import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.storage import Store
 
@@ -290,24 +290,29 @@ async def async_setup_services(hass: HomeAssistant, coordinator: "LedniceDataCoo
             "failed_products": failed_products
         })
 
-    async def handle_verify_pin(call: ServiceCall) -> None:
+    async def handle_verify_pin(call: ServiceCall) -> dict:
         """Handle verify PIN service (for self-service)."""
         coord = get_coordinator()
         if not coord:
             _LOGGER.error("No Lednice coordinator found")
-            return
+            return {
+                "valid": False,
+                "room": None,
+                "error": "No coordinator found"
+            }
 
         pin = call.data.get(ATTR_PIN)
 
         # Validate PIN exists and is not empty
         if not pin:
             _LOGGER.warning("🔐 PIN verification FAILED: Empty PIN provided")
-            hass.bus.async_fire(f"{DOMAIN}_pin_verified", {
+            response = {
                 "pin": "",
                 "valid": False,
                 "room": None
-            })
-            return
+            }
+            hass.bus.async_fire(f"{DOMAIN}_pin_verified", response)
+            return response
 
         room = coord.get_room_by_pin(pin)
 
@@ -319,13 +324,16 @@ async def async_setup_services(hass: HomeAssistant, coordinator: "LedniceDataCoo
         )
 
         # Fire event with verification result - ENSURE room is None if invalid
-        event_data = {
+        response = {
             "pin": pin,
             "valid": is_valid,
             "room": room if is_valid else None
         }
-        _LOGGER.warning(f"🔔 Firing event lednice_pin_verified with data: {event_data}")
-        hass.bus.async_fire(f"{DOMAIN}_pin_verified", event_data)
+        _LOGGER.warning(f"🔔 Firing event lednice_pin_verified with data: {response}")
+        hass.bus.async_fire(f"{DOMAIN}_pin_verified", response)
+
+        # Return response data directly to the service caller
+        return response
 
     # Register services
     hass.services.async_register(
@@ -415,7 +423,8 @@ async def async_setup_services(hass: HomeAssistant, coordinator: "LedniceDataCoo
         handle_verify_pin,
         schema=vol.Schema({
             vol.Required(ATTR_PIN): cv.string,
-        })
+        }),
+        supports_response=SupportsResponse.OPTIONAL
     )
 
 

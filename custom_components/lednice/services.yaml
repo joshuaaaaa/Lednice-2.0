@@ -183,6 +183,8 @@ consume_products:
 verify_pin:
   name: Ověřit PIN
   description: Ověří platnost PIN kódu pro self-service.
+  response:
+    description: Vrátí výsledek ověření PIN.
   fields:
     pin:
       name: PIN
