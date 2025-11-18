@@ -852,7 +852,7 @@ window.customCards.push({
 });
 
 console.info(
-  '%c LEDNICE-SELFSERVICE-CARD %c 2.0.9-SERVER-AUTH ',
-  'color: white; background: #2196F3; font-weight: 700;',
-  'color: #2196F3; background: white; font-weight: 700;',
+  '%c LEDNICE-SELFSERVICE-CARD %c 2.0.10-EVENT-ONLY ',
+  'color: white; background: #4CAF50; font-weight: 700;',
+  'color: #4CAF50; background: white; font-weight: 700;',
 );
