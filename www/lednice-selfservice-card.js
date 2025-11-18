@@ -329,16 +329,19 @@ class LedniceSelfServiceCard extends HTMLElement {
         errorEl.style.color = 'var(--primary-color)';
       }
 
-      // Call Home Assistant service - get response directly
-      const response = await this._hass.callService('lednice', 'verify_pin', {
-        pin: this._pin
-      }, { return_response: true });
+      // Call Home Assistant service - with correct syntax for response
+      const response = await this._hass.callService(
+        'lednice',
+        'verify_pin',
+        { pin: this._pin },
+        { return_response: true }  // This should work with SupportsResponse.OPTIONAL
+      );
 
       console.warn('📡 Service response received:', response);
 
-      // Process response immediately (faster than waiting for event)
-      if (response && response.response) {
-        this._handlePinVerificationEvent(response.response);
+      // Process response - HA returns the dict directly
+      if (response) {
+        this._handlePinVerificationEvent(response);
       } else {
         console.warn('⚠️ No response data, falling back to event listener');
         // Event listener will handle it
