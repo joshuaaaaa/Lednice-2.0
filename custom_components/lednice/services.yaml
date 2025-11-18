@@ -1,0 +1,193 @@
+add_item:
+  name: Přidat položku
+  description: Přidá novou položku nebo zvýší počet existující položky v inventáři.
+  fields:
+    item_name:
+      name: Název položky
+      description: Název jídla nebo pití.
+      required: true
+      example: "Coca Cola"
+      selector:
+        text:
+    quantity:
+      name: Počet kusů
+      description: Počet kusů k přidání.
+      required: false
+      default: 1
+      example: 5
+      selector:
+        number:
+          min: 1
+          max: 100
+    code:
+      name: Čárový kód
+      description: Čárový kód položky (pro skenování).
+      required: false
+      example: "8594001652419"
+      selector:
+        text:
+
+remove_item:
+  name: Odebrat položku
+  description: Odebere položku z inventáře.
+  fields:
+    item_name:
+      name: Název položky
+      description: Název jídla nebo pití k odebrání.
+      required: true
+      example: "Coca Cola"
+      selector:
+        text:
+    quantity:
+      name: Počet kusů
+      description: Počet kusů k odebrání.
+      required: false
+      default: 1
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 100
+    pin:
+      name: PIN pokoje
+      description: PIN pro identifikaci pokoje.
+      required: false
+      example: "1234"
+      selector:
+        text:
+
+update_item:
+  name: Aktualizovat položku
+  description: Aktualizuje počet nebo kód existující položky.
+  fields:
+    item_name:
+      name: Název položky
+      description: Název jídla nebo pití.
+      required: true
+      example: "Coca Cola"
+      selector:
+        text:
+    quantity:
+      name: Počet kusů
+      description: Nový počet kusů.
+      required: true
+      example: 10
+      selector:
+        number:
+          min: 0
+          max: 100
+    code:
+      name: Čárový kód
+      description: Nový čárový kód položky.
+      required: false
+      example: "8594001652419"
+      selector:
+        text:
+
+scan_code:
+  name: Naskenovat kód
+  description: Naskenuje čárový kód a odebere položku z inventáře.
+  fields:
+    code:
+      name: Čárový kód
+      description: Naskenovaný čárový kód.
+      required: true
+      example: "8594001652419"
+      selector:
+        text:
+    pin:
+      name: PIN pokoje
+      description: PIN pro identifikaci pokoje.
+      required: false
+      example: "1234"
+      selector:
+        text:
+
+reset_inventory:
+  name: Resetovat inventář
+  description: Vymaže celý inventář a historii spotřeby.
+
+add_product_code:
+  name: Přidat produktový kód
+  description: Přidá nebo aktualizuje produktový kód (1-100) s názvem a cenou.
+  fields:
+    product_code:
+      name: Produktový kód
+      description: Číslo produktu (1-100).
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 100
+    product_name:
+      name: Název produktu
+      description: Název produktu.
+      required: true
+      example: "Coca Cola 0.5L"
+      selector:
+        text:
+    price:
+      name: Cena
+      description: Cena produktu (Kč).
+      required: false
+      default: 0.0
+      example: 35.0
+      selector:
+        number:
+          min: 0
+          max: 1000
+          step: 0.01
+          mode: box
+    code:
+      name: Čárový kód
+      description: Čárový kód produktu (volitelné).
+      required: false
+      example: "8594001652419"
+      selector:
+        text:
+
+remove_product_code:
+  name: Odebrat produktový kód
+  description: Odebere produktový kód z databáze.
+  fields:
+    product_code:
+      name: Produktový kód
+      description: Číslo produktu k odebrání (1-100).
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 100
+
+consume_products:
+  name: Spotřebovat produkty
+  description: Spotřebuje produkty pro pokoj (self-service).
+  fields:
+    pin:
+      name: PIN pokoje
+      description: PIN pro identifikaci pokoje.
+      required: true
+      example: "1234"
+      selector:
+        text:
+    products:
+      name: Produkty
+      description: Seznam produktových kódů k spotřebě.
+      required: true
+      example: [1, 2, 5]
+      selector:
+        object:
+
+verify_pin:
+  name: Ověřit PIN
+  description: Ověří platnost PIN kódu pro self-service.
+  fields:
+    pin:
+      name: PIN
+      description: PIN k ověření.
+      required: true
+      example: "1234"
+      selector:
+        text:

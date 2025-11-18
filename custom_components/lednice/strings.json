@@ -1,0 +1,31 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Nastavení Lednice",
+        "description": "Nastavte integraci Lednice pro správu inventáře.",
+        "data": {
+          "name": "Název"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Nastavení PIN kódů pro pokoje",
+        "description": "Nastavte PIN kódy pro jednotlivé pokoje (room1-room8).",
+        "data": {
+          "pin_room1": "PIN pro Room 1",
+          "pin_room2": "PIN pro Room 2",
+          "pin_room3": "PIN pro Room 3",
+          "pin_room4": "PIN pro Room 4",
+          "pin_room5": "PIN pro Room 5",
+          "pin_room6": "PIN pro Room 6",
+          "pin_room7": "PIN pro Room 7",
+          "pin_room8": "PIN pro Room 8"
+        }
+      }
+    }
+  }
+}

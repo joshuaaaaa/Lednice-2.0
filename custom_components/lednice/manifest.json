@@ -1,0 +1,11 @@
+{
+  "domain": "lednice",
+  "name": "Lednice - Self-Service Fridge for Guesthouse",
+  "documentation": "https://github.com/joshuaaaaa/Lednice",
+  "issue_tracker": "https://github.com/joshuaaaaa/Lednice/issues",
+  "requirements": [],
+  "codeowners": ["@joshuaaaaa"],
+  "config_flow": true,
+  "version": "2.0.2",
+  "iot_class": "local_polling"
+}
