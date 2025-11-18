@@ -153,33 +153,33 @@ class LedniceSelfServiceCard extends HTMLElement {
       <style>
         .selfservice-container {
           font-family: var(--paper-font-body1_-_font-family);
-          padding: 20px;
+          padding: 10px;
         }
         .pin-screen {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 20px;
-          padding: 40px 20px;
+          gap: 12px;
+          padding: 15px 10px;
         }
         .pin-title {
-          font-size: 24px;
+          font-size: 20px;
           font-weight: 500;
           color: var(--primary-text-color);
         }
         .pin-subtitle {
-          font-size: 14px;
+          font-size: 13px;
           color: var(--secondary-text-color);
           text-align: center;
         }
         .pin-input {
-          font-size: 32px;
-          padding: 15px 30px;
+          font-size: 28px;
+          padding: 10px 20px;
           border: 2px solid var(--primary-color);
           border-radius: 8px;
           text-align: center;
-          letter-spacing: 10px;
-          width: 200px;
+          letter-spacing: 8px;
+          width: 180px;
           background: var(--card-background-color);
           color: var(--primary-text-color);
         }
@@ -195,12 +195,12 @@ class LedniceSelfServiceCard extends HTMLElement {
         .pin-keypad {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 15px;
-          max-width: 300px;
+          gap: 10px;
+          max-width: 260px;
         }
         .pin-button {
-          font-size: 24px;
-          padding: 20px;
+          font-size: 20px;
+          padding: 15px;
           border: 2px solid var(--divider-color);
           border-radius: 8px;
           background: var(--primary-color);
@@ -225,23 +225,23 @@ class LedniceSelfServiceCard extends HTMLElement {
         }
         .pin-error {
           color: var(--error-color);
-          font-size: 16px;
-          margin-top: 10px;
+          font-size: 14px;
+          margin-top: 0;
           font-weight: bold;
-          min-height: 24px;
+          min-height: 20px;
         }
         .pin-warning {
           color: var(--warning-color, orange);
-          font-size: 14px;
-          margin-top: 5px;
+          font-size: 12px;
+          margin-top: 0;
         }
         .security-badge {
           background: var(--success-color);
           color: white;
-          padding: 8px 16px;
-          border-radius: 20px;
-          font-size: 12px;
-          margin-top: 20px;
+          padding: 6px 12px;
+          border-radius: 16px;
+          font-size: 11px;
+          margin-top: 5px;
         }
       </style>
       <div class="selfservice-container">
@@ -852,7 +852,7 @@ window.customCards.push({
 });
 
 console.info(
-  '%c LEDNICE-SELFSERVICE-CARD %c 2.0.10-EVENT-ONLY ',
-  'color: white; background: #4CAF50; font-weight: 700;',
-  'color: #4CAF50; background: white; font-weight: 700;',
+  '%c LEDNICE-SELFSERVICE-CARD %c 2.0.11-COMPACT ',
+  'color: white; background: #FF9800; font-weight: 700;',
+  'color: #FF9800; background: white; font-weight: 700;',
 );
