@@ -1,0 +1,282 @@
+# Příklad kompletního dashboardu pro Lednice
+
+title: Lednice
+views:
+  - title: Přehled
+    path: overview
+    icon: mdi:fridge
+    cards:
+      # Hlavní karta s inventářem
+      - type: custom:lednice-card
+        entity: sensor.lednice_inventory
+        consumption_entity: sensor.lednice_consumption
+        title: Lednice - Inventář
+
+      # Rychlé statistiky
+      - type: horizontal-stack
+        cards:
+          - type: statistic
+            entity: sensor.lednice_inventory
+            name: Celkem položek
+            icon: mdi:package-variant
+            stat_type: state
+
+          - type: statistic
+            entity: sensor.lednice_consumption
+            name: Celková spotřeba
+            icon: mdi:chart-line
+            stat_type: state
+
+      # Skenování kódu
+      - type: entities
+        title: Skenování
+        entities:
+          - type: custom:text-input-row
+            entity: input_text.lednice_scan_code
+            name: Čárový kód
+          - type: custom:text-input-row
+            entity: input_text.lednice_scan_pin
+            name: PIN pokoje
+        footer:
+          type: button
+          name: Naskenovat
+          icon: mdi:barcode-scan
+          tap_action:
+            action: call-service
+            service: lednice.scan_code
+            data:
+              code: "{{ states('input_text.lednice_scan_code') }}"
+              pin: "{{ states('input_text.lednice_scan_pin') }}"
+
+      # Správa inventáře
+      - type: entities
+        title: Správa inventáře
+        entities:
+          - type: custom:text-input-row
+            entity: input_text.lednice_item_name
+            name: Název položky
+          - type: custom:number-input-row
+            entity: input_number.lednice_quantity
+            name: Počet kusů
+          - type: custom:text-input-row
+            entity: input_text.lednice_item_code
+            name: Čárový kód
+        footer:
+          type: buttons
+          entities:
+            - entity: script.lednice_add_item_script
+              name: Přidat
+              icon: mdi:plus
+            - entity: script.lednice_remove_item_script
+              name: Odebrat
+              icon: mdi:minus
+
+  - title: Spotřeba po pokojích
+    path: rooms
+    icon: mdi:door
+    cards:
+      # Grafy spotřeby po pokojích
+      - type: horizontal-stack
+        cards:
+          - type: statistic
+            entity: sensor.lednice_room1_consumption
+            name: Room 1
+            stat_type: state
+
+          - type: statistic
+            entity: sensor.lednice_room2_consumption
+            name: Room 2
+            stat_type: state
+
+          - type: statistic
+            entity: sensor.lednice_room3_consumption
+            name: Room 3
+            stat_type: state
+
+          - type: statistic
+            entity: sensor.lednice_room4_consumption
+            name: Room 4
+            stat_type: state
+
+      - type: horizontal-stack
+        cards:
+          - type: statistic
+            entity: sensor.lednice_room5_consumption
+            name: Room 5
+            stat_type: state
+
+          - type: statistic
+            entity: sensor.lednice_room6_consumption
+            name: Room 6
+            stat_type: state
+
+          - type: statistic
+            entity: sensor.lednice_room7_consumption
+            name: Room 7
+            stat_type: state
+
+          - type: statistic
+            entity: sensor.lednice_room8_consumption
+            name: Room 8
+            stat_type: state
+
+      # Detail spotřeby po pokojích
+      - type: entities
+        title: Detail spotřeby
+        entities:
+          - entity: sensor.lednice_room1_consumption
+            name: Room 1
+            icon: mdi:door
+          - entity: sensor.lednice_room2_consumption
+            name: Room 2
+            icon: mdi:door
+          - entity: sensor.lednice_room3_consumption
+            name: Room 3
+            icon: mdi:door
+          - entity: sensor.lednice_room4_consumption
+            name: Room 4
+            icon: mdi:door
+          - entity: sensor.lednice_room5_consumption
+            name: Room 5
+            icon: mdi:door
+          - entity: sensor.lednice_room6_consumption
+            name: Room 6
+            icon: mdi:door
+          - entity: sensor.lednice_room7_consumption
+            name: Room 7
+            icon: mdi:door
+          - entity: sensor.lednice_room8_consumption
+            name: Room 8
+            icon: mdi:door
+
+      # Graf spotřeby v čase (vyžaduje history_stats)
+      - type: history-graph
+        title: Historie spotřeby
+        entities:
+          - entity: sensor.lednice_room1_consumption
+          - entity: sensor.lednice_room2_consumption
+          - entity: sensor.lednice_room3_consumption
+          - entity: sensor.lednice_room4_consumption
+        hours_to_show: 168  # 7 dní
+
+  - title: Statistiky
+    path: statistics
+    icon: mdi:chart-bar
+    cards:
+      # Celková spotřeba
+      - type: gauge
+        entity: sensor.lednice_consumption
+        name: Celková spotřeba
+        min: 0
+        max: 1000
+        severity:
+          green: 0
+          yellow: 500
+          red: 800
+
+      # Top položky
+      - type: markdown
+        title: Top položky
+        content: >
+          {% set item_stats = state_attr('sensor.lednice_consumption', 'item_statistics') %}
+          {% if item_stats %}
+          {% for item, count in (item_stats.items() | sort(attribute=1, reverse=true))[:5] %}
+          **{{ loop.index }}.** {{ item }}: {{ count }} ks
+
+          {% endfor %}
+          {% else %}
+          Žádná data
+          {% endif %}
+
+      # Top pokoje
+      - type: markdown
+        title: Top pokoje
+        content: >
+          {% set room_stats = state_attr('sensor.lednice_consumption', 'room_statistics') %}
+          {% if room_stats %}
+          {% for room, count in (room_stats.items() | sort(attribute=1, reverse=true))[:5] %}
+          **{{ loop.index }}.** {{ room }}: {{ count }} ks
+
+          {% endfor %}
+          {% else %}
+          Žádná data
+          {% endif %}
+
+      # Poslední aktivity
+      - type: markdown
+        title: Poslední aktivity
+        content: >
+          {% set logs = state_attr('sensor.lednice_consumption', 'consumption_log') %}
+          {% if logs %}
+          {% for log in logs[-10:] | reverse %}
+          - **{{ log.item }}** ({{ log.quantity }}x) - {{ log.room or 'Neznámý' }} - {{ log.timestamp | as_timestamp | timestamp_custom('%d.%m %H:%M') }}
+
+          {% endfor %}
+          {% else %}
+          Žádná aktivita
+          {% endif %}
+
+  - title: Nastavení
+    path: settings
+    icon: mdi:cog
+    cards:
+      # Rychlé akce
+      - type: entities
+        title: Rychlé akce
+        entities:
+          - type: button
+            name: Reset inventáře
+            icon: mdi:delete-forever
+            tap_action:
+              action: call-service
+              service: lednice.reset_inventory
+              confirmation:
+                text: Opravdu chcete smazat celý inventář?
+
+      # Předdefinované položky
+      - type: entities
+        title: Přidat předdefinované položky
+        entities:
+          - type: button
+            name: Coca Cola (10ks)
+            icon: mdi:bottle-soda-classic
+            tap_action:
+              action: call-service
+              service: lednice.add_item
+              data:
+                item_name: "Coca Cola"
+                quantity: 10
+                code: "8594001652419"
+
+          - type: button
+            name: Red Bull (10ks)
+            icon: mdi:cup
+            tap_action:
+              action: call-service
+              service: lednice.add_item
+              data:
+                item_name: "Red Bull"
+                quantity: 10
+                code: "9002490100070"
+
+          - type: button
+            name: Voda (20ks)
+            icon: mdi:water
+            tap_action:
+              action: call-service
+              service: lednice.add_item
+              data:
+                item_name: "Voda"
+                quantity: 20
+                code: "8594001652426"
+
+          - type: button
+            name: Snickers (15ks)
+            icon: mdi:candy
+            tap_action:
+              action: call-service
+              service: lednice.add_item
+              data:
+                item_name: "Snickers"
+                quantity: 15
+                code: "5000159366908"

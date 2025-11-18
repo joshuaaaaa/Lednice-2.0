@@ -1,0 +1,161 @@
+# Příklady automatizací pro Lednice
+
+# 1. Notifikace při úspěšném skenování
+- alias: "Lednice - Notifikace při skenování"
+  description: "Pošle notifikaci při úspěšném nebo neúspěšném skenování"
+  trigger:
+    - platform: event
+      event_type: lednice_item_scanned
+  action:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.success }}"
+          sequence:
+            - service: notify.mobile_app
+              data:
+                title: "Lednice"
+                message: >
+                  ✅ {{ trigger.event.data.item }} odebrán
+                  {% if trigger.event.data.room %}
+                  Pokoj: {{ trigger.event.data.room }}
+                  {% endif %}
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.reason == 'out_of_stock' }}"
+          sequence:
+            - service: notify.mobile_app
+              data:
+                title: "Lednice - Vyprodáno"
+                message: "❌ {{ trigger.event.data.item }} není na skladě!"
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.reason == 'unknown_code' }}"
+          sequence:
+            - service: notify.mobile_app
+              data:
+                title: "Lednice - Neznámý kód"
+                message: "⚠️ Naskenován neznámý kód: {{ trigger.event.data.code }}"
+
+# 2. Upozornění na nízký stav zásob
+- alias: "Lednice - Upozornění na nízký stav"
+  description: "Upozorní když některá položka má méně než 3 kusy"
+  trigger:
+    - platform: state
+      entity_id: sensor.lednice_inventory
+  condition:
+    - condition: template
+      value_template: >
+        {% set low_items = state_attr('sensor.lednice_inventory', 'items_detail')
+           | selectattr('quantity', 'le', 2) | list %}
+        {{ low_items | length > 0 }}
+  action:
+    - service: notify.mobile_app
+      data:
+        title: "Lednice - Nízký stav zásob"
+        message: >
+          Následující položky mají nízký stav:
+          {% set low_items = state_attr('sensor.lednice_inventory', 'items_detail')
+             | selectattr('quantity', 'le', 2) | list %}
+          {% for item in low_items %}
+          - {{ item.name }}: {{ item.quantity }} ks
+          {% endfor %}
+
+# 3. Denní report spotřeby
+- alias: "Lednice - Denní report"
+  description: "Pošle denní přehled spotřeby v 20:00"
+  trigger:
+    - platform: time
+      at: "20:00:00"
+  action:
+    - service: notify.mobile_app
+      data:
+        title: "Lednice - Denní report"
+        message: >
+          📊 Dnešní spotřeba:
+          {% set room_stats = state_attr('sensor.lednice_consumption', 'room_statistics') %}
+          {% for room, count in room_stats.items() %}
+          {{ room }}: {{ count }} ks
+          {% endfor %}
+
+          Celkem položek v inventáři: {{ states('sensor.lednice_inventory') }}
+
+# 4. Automatické doplnění při skenování neznámého kódu
+- alias: "Lednice - Přidání nové položky"
+  description: "Umožní přidat novou položku po skenování neznámého kódu"
+  trigger:
+    - platform: event
+      event_type: lednice_item_scanned
+      event_data:
+        success: false
+        reason: unknown_code
+  action:
+    - service: input_text.set_value
+      target:
+        entity_id: input_text.lednice_last_unknown_code
+      data:
+        value: "{{ trigger.event.data.code }}"
+    - service: notify.mobile_app
+      data:
+        title: "Lednice - Nová položka?"
+        message: "Přejděte do aplikace pro přidání položky s kódem {{ trigger.event.data.code }}"
+        data:
+          actions:
+            - action: "LEDNICE_ADD_ITEM"
+              title: "Přidat položku"
+
+# 5. Týdenní reset statistik (volitelné)
+- alias: "Lednice - Týdenní archivace"
+  description: "Každou neděli v půlnoci archivuje statistiky"
+  trigger:
+    - platform: time
+      at: "00:00:00"
+  condition:
+    - condition: time
+      weekday:
+        - sun
+  action:
+    - service: notify.mobile_app
+      data:
+        title: "Lednice - Týdenní report"
+        message: >
+          📈 Týdenní statistiky:
+          Celková spotřeba: {{ state_attr('sensor.lednice_consumption', 'total_consumed') }}
+
+          Top pokoje:
+          {% set room_stats = state_attr('sensor.lednice_consumption', 'room_statistics') %}
+          {% for room, count in (room_stats.items() | sort(attribute=1, reverse=true))[:3] %}
+          {{ loop.index }}. {{ room }}: {{ count }} ks
+          {% endfor %}
+
+# 6. Kontrola inventáře každou hodinu
+- alias: "Lednice - Hodinová kontrola"
+  description: "Kontroluje stav inventáře každou hodinu"
+  trigger:
+    - platform: time_pattern
+      hours: "*"
+  condition:
+    - condition: template
+      value_template: >
+        {% set items = state_attr('sensor.lednice_inventory', 'items_detail') | length %}
+        {{ items == 0 }}
+  action:
+    - service: notify.mobile_app
+      data:
+        title: "Lednice - Prázdný inventář"
+        message: "⚠️ Inventář lednice je prázdný!"
+
+# 7. Notifikace pro konkrétní pokoj
+- alias: "Lednice - Room1 spotřeba"
+  description: "Upozorní když room1 odebere více než 10 položek za den"
+  trigger:
+    - platform: state
+      entity_id: sensor.lednice_room1_consumption
+  condition:
+    - condition: template
+      value_template: "{{ states('sensor.lednice_room1_consumption') | int > 10 }}"
+  action:
+    - service: notify.mobile_app
+      data:
+        title: "Lednice - Vysoká spotřeba Room1"
+        message: "Room1 odebral {{ states('sensor.lednice_room1_consumption') }} položek dnes"

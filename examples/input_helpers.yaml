@@ -1,0 +1,81 @@
+# Input helpery pro Lednice dashboard
+# Zkopírujte do configuration.yaml nebo do samostatného souboru
+
+input_text:
+  lednice_scan_code:
+    name: Lednice - Skenovaný kód
+    initial: ""
+    icon: mdi:barcode
+
+  lednice_scan_pin:
+    name: Lednice - PIN
+    initial: ""
+    icon: mdi:lock
+
+  lednice_item_name:
+    name: Lednice - Název položky
+    initial: ""
+    icon: mdi:tag
+
+  lednice_item_code:
+    name: Lednice - Čárový kód položky
+    initial: ""
+    icon: mdi:barcode
+
+  lednice_last_unknown_code:
+    name: Lednice - Poslední neznámý kód
+    initial: ""
+    icon: mdi:barcode-scan
+
+input_number:
+  lednice_quantity:
+    name: Lednice - Počet kusů
+    initial: 1
+    min: 1
+    max: 100
+    step: 1
+    icon: mdi:counter
+
+script:
+  lednice_add_item_script:
+    alias: Přidat položku do lednice
+    sequence:
+      - service: lednice.add_item
+        data:
+          item_name: "{{ states('input_text.lednice_item_name') }}"
+          quantity: "{{ states('input_number.lednice_quantity') | int }}"
+          code: "{{ states('input_text.lednice_item_code') }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.lednice_item_name
+        data:
+          value: ""
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.lednice_item_code
+        data:
+          value: ""
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.lednice_quantity
+        data:
+          value: 1
+
+  lednice_remove_item_script:
+    alias: Odebrat položku z lednice
+    sequence:
+      - service: lednice.remove_item
+        data:
+          item_name: "{{ states('input_text.lednice_item_name') }}"
+          quantity: "{{ states('input_number.lednice_quantity') | int }}"
+          pin: "{{ states('input_text.lednice_scan_pin') }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.lednice_item_name
+        data:
+          value: ""
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.lednice_quantity
+        data:
+          value: 1

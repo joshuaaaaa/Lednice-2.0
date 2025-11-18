@@ -1,0 +1,7 @@
+{
+  "name": "Lednice - Self-Service Fridge for Guesthouse",
+  "content_in_root": false,
+  "filename": "lednice",
+  "render_readme": true,
+  "homeassistant": "2023.1.0"
+}
