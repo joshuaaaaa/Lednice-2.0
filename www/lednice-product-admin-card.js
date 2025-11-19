@@ -12,6 +12,7 @@ class LedniceProductAdminCard extends HTMLElement {
     this._locked = false;
     this._errorMessage = '';
     this._productCodes = {};
+    this._inventory = {};
     this._editingProduct = null;
     this._formData = {
       code: '',
@@ -35,10 +36,13 @@ class LedniceProductAdminCard extends HTMLElement {
     // Setup event listener NOW that we have hass
     this._setupEventListener();
 
-    // Load product codes from entity attributes
+    // Load product codes and inventory from entity attributes
     const entity = hass.states[this._config.entity];
     if (entity && entity.attributes.product_codes) {
       this._productCodes = entity.attributes.product_codes;
+    }
+    if (entity && entity.attributes.inventory) {
+      this._inventory = entity.attributes.inventory;
     }
 
     // Check session timeout
@@ -207,11 +211,42 @@ class LedniceProductAdminCard extends HTMLElement {
         barcode: product.barcode || '',
         quantity: '' // Leave empty for editing - product codes don't store quantity
       };
-      this.render();
-      // Scroll to form
-      setTimeout(() => {
-        this.shadowRoot.querySelector('.product-form')?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+
+      // Update form inputs directly without re-rendering (prevents blinking)
+      const form = this.shadowRoot.querySelector('.product-form');
+      if (form) {
+        const codeInput = form.querySelector('#product-code');
+        const nameInput = form.querySelector('#product-name');
+        const priceInput = form.querySelector('#product-price');
+        const barcodeInput = form.querySelector('#product-barcode');
+        const quantityInput = form.querySelector('#product-quantity');
+
+        if (codeInput) codeInput.value = this._formData.code;
+        if (nameInput) nameInput.value = this._formData.name;
+        if (priceInput) priceInput.value = this._formData.price;
+        if (barcodeInput) barcodeInput.value = this._formData.barcode;
+        if (quantityInput) quantityInput.value = this._formData.quantity;
+
+        // Update button text
+        const submitBtn = form.querySelector('[data-action="submit"]');
+        if (submitBtn) {
+          submitBtn.innerHTML = '💾 Aktualizovat produkt';
+        }
+
+        // Add cancel button if not exists
+        const actionsDiv = form.querySelector('.form-actions');
+        if (actionsDiv && !actionsDiv.querySelector('[data-action="cancel"]')) {
+          const cancelBtn = document.createElement('button');
+          cancelBtn.className = 'btn btn-secondary';
+          cancelBtn.setAttribute('data-action', 'cancel');
+          cancelBtn.textContent = 'Zrušit';
+          cancelBtn.addEventListener('click', () => this._clearForm());
+          actionsDiv.appendChild(cancelBtn);
+        }
+
+        // Scroll to form
+        form.scrollIntoView({ behavior: 'smooth' });
+      }
     }
   }
 
@@ -495,10 +530,36 @@ class LedniceProductAdminCard extends HTMLElement {
         }
 
         .product-code {
-          font-size: 20px;
-          font-weight: 700;
-          color: var(--primary-color);
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          align-items: center;
           text-align: center;
+          min-width: 60px;
+        }
+
+        .stock-badge {
+          font-size: 16px;
+          font-weight: 700;
+          padding: 4px 8px;
+          border-radius: 6px;
+          min-width: 50px;
+        }
+
+        .stock-badge.in-stock {
+          background: #4CAF50;
+          color: white;
+        }
+
+        .stock-badge.out-of-stock {
+          background: #f44336;
+          color: white;
+        }
+
+        .product-number {
+          font-size: 11px;
+          color: var(--secondary-text-color);
+          font-weight: 500;
         }
 
         .product-details {
@@ -605,9 +666,17 @@ class LedniceProductAdminCard extends HTMLElement {
   _renderProductManager() {
     const productList = Object.entries(this._productCodes)
       .sort((a, b) => parseInt(a[0]) - parseInt(b[0]))
-      .map(([code, product]) => `
+      .map(([code, product]) => {
+        // Find inventory quantity by product name
+        const inventoryItem = this._inventory[product.name];
+        const stockQuantity = inventoryItem ? inventoryItem.quantity : 0;
+
+        return `
         <div class="product-item">
-          <div class="product-code">${code}</div>
+          <div class="product-code">
+            <div class="stock-badge ${stockQuantity > 0 ? 'in-stock' : 'out-of-stock'}">${stockQuantity} ks</div>
+            <div class="product-number">#${code}</div>
+          </div>
           <div class="product-details">
             <div class="product-name">${product.name}</div>
             <div class="product-info">
@@ -618,7 +687,8 @@ class LedniceProductAdminCard extends HTMLElement {
           <button class="icon-btn edit" data-action="edit" data-code="${code}">✏️</button>
           <button class="icon-btn delete" data-action="delete" data-code="${code}">🗑️</button>
         </div>
-      `).join('');
+      `;
+      }).join('');
 
     return `
       <div class="card-header">
