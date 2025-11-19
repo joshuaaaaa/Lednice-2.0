@@ -569,7 +569,7 @@ class LedniceProductAdminCard extends HTMLElement {
     return `
       <div class="pin-container">
         <div class="pin-title">🔒 Správa produktů</div>
-        <div class="pin-subtitle">Pouze pro vlastníka (PIN 0000)</div>
+        <div class="pin-subtitle">Zadejte PIN vlastníka</div>
 
         <div class="pin-display">
           ${dots}
