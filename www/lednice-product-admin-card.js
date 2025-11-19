@@ -25,11 +25,13 @@ class LedniceProductAdminCard extends HTMLElement {
       throw new Error('Entity is required');
     }
     this._config = config;
-    this._setupEventListener();
   }
 
   set hass(hass) {
     this._hass = hass;
+
+    // Setup event listener NOW that we have hass
+    this._setupEventListener();
 
     // Load product codes from entity attributes
     const entity = hass.states[this._config.entity];
@@ -52,50 +54,70 @@ class LedniceProductAdminCard extends HTMLElement {
   }
 
   _setupEventListener() {
-    if (!this._eventListenerSetup) {
-      this._eventListenerSetup = true;
+    if (!this._eventListenerSetup && this._hass) {
+      console.log('📡 Setting up event listener for lednice_pin_verified');
 
-      // Listen for PIN verification events
-      this._hass?.connection?.subscribeEvents((event) => {
-        console.log('PIN verification event received:', event.data);
-
-        if (event.data.success) {
-          if (event.data.room === 'owner') {
-            this._authenticated = true;
-            this._serverValidatedRoom = event.data.room;
-            this._sessionTimestamp = Date.now();
-            this._failedAttempts = 0;
-            this._pin = '';
-            console.log('Owner authenticated successfully');
-          } else {
-            // Not owner PIN
-            this._failedAttempts++;
-            this._pin = '';
-            if (this._failedAttempts >= 3) {
-              this._locked = true;
-              setTimeout(() => {
-                this._locked = false;
-                this._failedAttempts = 0;
-                this.render();
-              }, 30000); // 30 second lockout
-            }
-            alert('Pouze vlastník (PIN 0000) má přístup k této kartě!');
-          }
-        } else {
-          this._failedAttempts++;
-          this._pin = '';
-          if (this._failedAttempts >= 3) {
-            this._locked = true;
-            setTimeout(() => {
-              this._locked = false;
-              this._failedAttempts = 0;
-              this.render();
-            }, 30000);
-          }
-        }
-
-        this.render();
+      // Listen for PIN verification events from server
+      this._hass.connection.subscribeEvents((event) => {
+        console.log('📨 Received lednice_pin_verified event:', event.data);
+        this._handlePinVerificationEvent(event.data);
       }, 'lednice_pin_verified');
+
+      this._eventListenerSetup = true;
+    }
+  }
+
+  _handlePinVerificationEvent(data) {
+    const { valid, room, pin } = data;
+
+    console.log(`🔐 Server PIN verification result: valid=${valid}, room=${room}, pin=${pin}`);
+
+    if (valid === true && room === 'owner') {
+      // ✅ SERVER CONFIRMED - Owner PIN
+      console.log(`✅ SERVER APPROVED ACCESS - Owner authenticated`);
+      this._authenticated = true;
+      this._serverValidatedRoom = room;
+      this._sessionTimestamp = Date.now();
+      this._failedAttempts = 0;
+      this._pin = '';
+      this.render();
+    } else if (valid === true && room !== 'owner') {
+      // Valid PIN but not owner
+      console.log('❌ Valid PIN but not owner - Access denied');
+      this._authenticated = false;
+      this._serverValidatedRoom = null;
+      this._failedAttempts++;
+      this._pin = '';
+
+      if (this._failedAttempts >= 3) {
+        this._locked = true;
+        setTimeout(() => {
+          this._locked = false;
+          this._failedAttempts = 0;
+          this.render();
+        }, 30000);
+      }
+
+      alert('Pouze vlastník (PIN 0000) má přístup k této kartě!');
+      this.render();
+    } else {
+      // ❌ SERVER REJECTED - Invalid PIN
+      console.log('❌ SERVER DENIED ACCESS - Invalid PIN');
+      this._authenticated = false;
+      this._serverValidatedRoom = null;
+      this._failedAttempts++;
+      this._pin = '';
+
+      if (this._failedAttempts >= 3) {
+        this._locked = true;
+        setTimeout(() => {
+          this._locked = false;
+          this._failedAttempts = 0;
+          this.render();
+        }, 30000);
+      }
+
+      this.render();
     }
   }
 
