@@ -10,6 +10,7 @@ class LedniceProductAdminCard extends HTMLElement {
     this._sessionTimestamp = null;
     this._failedAttempts = 0;
     this._locked = false;
+    this._errorMessage = '';
     this._productCodes = {};
     this._editingProduct = null;
     this._formData = {
@@ -80,40 +81,30 @@ class LedniceProductAdminCard extends HTMLElement {
       this._serverValidatedRoom = room;
       this._sessionTimestamp = Date.now();
       this._failedAttempts = 0;
+      this._errorMessage = '';
       this._pin = '';
-      this.render();
-    } else if (valid === true && room !== 'owner') {
-      // Valid PIN but not owner
-      console.log('❌ Valid PIN but not owner - Access denied');
-      this._authenticated = false;
-      this._serverValidatedRoom = null;
-      this._failedAttempts++;
-      this._pin = '';
-
-      if (this._failedAttempts >= 3) {
-        this._locked = true;
-        setTimeout(() => {
-          this._locked = false;
-          this._failedAttempts = 0;
-          this.render();
-        }, 30000);
-      }
-
-      alert('Pouze vlastník (PIN 0000) má přístup k této kartě!');
       this.render();
     } else {
-      // ❌ SERVER REJECTED - Invalid PIN
-      console.log('❌ SERVER DENIED ACCESS - Invalid PIN');
+      // ❌ SERVER REJECTED - Invalid PIN or not owner
+      console.log('❌ ACCESS DENIED - Invalid PIN or not owner');
       this._authenticated = false;
       this._serverValidatedRoom = null;
       this._failedAttempts++;
       this._pin = '';
 
+      if (valid === true && room !== 'owner') {
+        this._errorMessage = 'Přístup pouze pro vlastníka';
+      } else {
+        this._errorMessage = 'Neplatný PIN';
+      }
+
       if (this._failedAttempts >= 3) {
         this._locked = true;
+        this._errorMessage = 'Příliš mnoho pokusů';
         setTimeout(() => {
           this._locked = false;
           this._failedAttempts = 0;
+          this._errorMessage = '';
           this.render();
         }, 30000);
       }
@@ -127,6 +118,7 @@ class LedniceProductAdminCard extends HTMLElement {
 
     if (digit === 'clear') {
       this._pin = '';
+      this._errorMessage = '';
     } else if (digit === 'enter') {
       if (this._pin.length > 0) {
         this._verifyPin();
@@ -135,6 +127,7 @@ class LedniceProductAdminCard extends HTMLElement {
       if (this._pin.length < 4) {
         this._pin += digit;
       }
+      this._errorMessage = ''; // Clear error when user starts typing
     }
 
     this.render();
@@ -595,7 +588,7 @@ class LedniceProductAdminCard extends HTMLElement {
           ${dots}
         </div>
 
-        ${this._locked ? '<div class="lockout-message">Příliš mnoho pokusů. Počkejte 30 sekund.</div>' : ''}
+        ${this._errorMessage ? `<div class="lockout-message">${this._errorMessage}</div>` : ''}
 
         <div class="pin-keypad">
           ${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n =>
