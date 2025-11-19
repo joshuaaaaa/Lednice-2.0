@@ -32,7 +32,10 @@ Aplikace pro správu inventáře samoobslužné lednice v penzionu s podporou č
 ### Manuální instalace
 
 1. Zkopírujte složku `custom_components/lednice` do vaší složky `config/custom_components/`
-2. Zkopírujte soubory `www/lednice-card.js` a `www/lednice-selfservice-card.js` do vaší složky `config/www/`
+2. Zkopírujte soubory z `www/` do vaší složky `config/www/`:
+   - `lednice-card.js` - Karta pro zobrazení inventáře
+   - `lednice-selfservice-card.js` - Karta pro samoobsluhu
+   - `lednice-product-admin-card.js` - Karta pro správu produktů
 3. Vytvořte složku `config/www/lednice/products/` pro obrázky produktů
 4. Restartujte Home Assistant
 
@@ -84,9 +87,10 @@ Přidejte do dashboardu:
 1. Otevřete váš dashboard v režimu úprav
 2. Klikněte na tři tečky vpravo nahoře
 3. Vyberte **Spravovat zdroje**
-4. Přidejte obě karty:
+4. Přidejte všechny tři karty:
    - URL: `/local/lednice-card.js` - Typ: **JavaScript modul**
    - URL: `/local/lednice-selfservice-card.js` - Typ: **JavaScript modul**
+   - URL: `/local/lednice-product-admin-card.js` - Typ: **JavaScript modul**
 5. Klikněte na **Vytvořit**
 
 ### Karta pro správu inventáře
@@ -128,6 +132,38 @@ inactivity_timeout: 60  # Automatické odhlášení po 60 sekundách nečinnosti
 - Fullscreen mód
 - Kiosk mode (pomocí HACS addon "Kiosk Mode")
 - Nastavte `inactivity_timeout` podle potřeby (např. 120 pro 2 minuty)
+
+### Karta pro správu produktů (PIN ochrana)
+
+Pro snadnou správu produktové databáze - pouze pro vlastníka:
+
+```yaml
+type: custom:lednice-product-admin-card
+entity: sensor.lednice_inventory
+title: Správa produktů
+session_timeout: 300  # Automatické odhlášení po 5 minutách (volitelné)
+```
+
+**Konfigurace:**
+- `entity` (povinné) - Sensor inventáře (např. `sensor.lednice_inventory`)
+- `title` (volitelné) - Název karty (výchozí: "Správa produktů")
+- `session_timeout` (volitelné) - Timeout v sekundách pro automatické odhlášení (výchozí: 300)
+
+**Funkce karty:**
+- 🔒 **PIN ochrana** - Přístup pouze s PIN vlastníka (0000)
+- ➕ **Přidávání produktů** - Formulář pro kód (1-100), název, cenu a čárový kód
+- ✏️ **Editace produktů** - Jednoduchá úprava existujících produktů
+- 🗑️ **Mazání produktů** - Odstranění produktu s potvrzením
+- 📋 **Přehled produktů** - Seznam všech produktů s detaily
+- 🔐 **Zabezpečení** - Lockout po 3 neúspěšných pokusech (30 sekund)
+- ⏱️ **Auto-logout** - Automatické odhlášení po nečinnosti (výchozí 5 minut)
+
+**Výhody oproti službám:**
+- ✓ User-friendly webové rozhraní místo YAML
+- ✓ Okamžitý vizuální přehled všech produktů
+- ✓ Rychlá editace bez psaní služeb
+- ✓ Ochrana PIN kódem - nedostupné hostům
+- ✓ Ideální pro tablet nebo mobilní správu
 
 ## 🚀 Použití
 
