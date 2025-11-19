@@ -16,7 +16,8 @@ class LedniceProductAdminCard extends HTMLElement {
       code: '',
       name: '',
       price: '',
-      barcode: ''
+      barcode: '',
+      quantity: ''
     };
   }
 
@@ -148,11 +149,11 @@ class LedniceProductAdminCard extends HTMLElement {
 
   _handleFormInput(field, value) {
     this._formData[field] = value;
-    this.render();
+    // DON'T call render() - it would lose focus on input fields
   }
 
   _handleSubmit() {
-    const { code, name, price, barcode } = this._formData;
+    const { code, name, price, barcode, quantity } = this._formData;
 
     // Validation
     if (!code || code < 1 || code > 100) {
@@ -170,14 +171,31 @@ class LedniceProductAdminCard extends HTMLElement {
       return;
     }
 
-    // Call service to add/update product
+    if (quantity && (quantity < 0 || !Number.isInteger(parseFloat(quantity)))) {
+      alert('Prosím zadejte celé číslo pro počet kusů');
+      return;
+    }
+
+    // 1. Add/update product code (template)
     this._hass.callService('lednice', 'add_product_code', {
       product_code: parseInt(code),
       product_name: name.trim(),
       price: parseFloat(price),
       code: barcode.trim()
     }).then(() => {
-      alert(`Produkt ${code} byl úspěšně ${this._editingProduct ? 'aktualizován' : 'přidán'}!`);
+      // 2. If quantity is specified, add to inventory
+      if (quantity && parseInt(quantity) > 0) {
+        return this._hass.callService('lednice', 'add_item', {
+          item_name: name.trim(),
+          quantity: parseInt(quantity),
+          code: barcode.trim() || undefined
+        });
+      }
+    }).then(() => {
+      const msg = this._editingProduct
+        ? `Produkt ${code} byl aktualizován!`
+        : `Produkt ${code} byl přidán${quantity ? ` a ${quantity} ks přidáno do inventáře` : ''}!`;
+      alert(msg);
       this._clearForm();
       this.render();
     }).catch((err) => {
@@ -193,7 +211,8 @@ class LedniceProductAdminCard extends HTMLElement {
         code: code,
         name: product.name || '',
         price: product.price || '',
-        barcode: product.barcode || ''
+        barcode: product.barcode || '',
+        quantity: '' // Leave empty for editing - product codes don't store quantity
       };
       this.render();
       // Scroll to form
@@ -225,7 +244,8 @@ class LedniceProductAdminCard extends HTMLElement {
       code: '',
       name: '',
       price: '',
-      barcode: ''
+      barcode: '',
+      quantity: ''
     };
     this.render();
   }
@@ -647,6 +667,19 @@ class LedniceProductAdminCard extends HTMLElement {
               min="0"
               value="${this._formData.price}"
               data-field="price"
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="product-quantity">Počet kusů (volitelné)</label>
+            <input
+              type="number"
+              id="product-quantity"
+              min="0"
+              step="1"
+              value="${this._formData.quantity}"
+              data-field="quantity"
+              placeholder="0"
             >
           </div>
 
