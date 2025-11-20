@@ -347,12 +347,67 @@ async def async_setup_services(hass: HomeAssistant, coordinator: "LedniceDataCoo
             f"Available PINs={dict(coord.room_pins)}"
         )
 
-        # Fire event with verification result - ENSURE room is None if invalid
+        # Prepare response with consumption data
         response = {
             "pin": pin,
             "valid": is_valid,
             "room": room if is_valid else None
         }
+
+        # If valid, add consumption information
+        if is_valid and room:
+            # Get guest info from Previo if available
+            previo_pins = coord.data.get("previo_pins", {})
+            guest_info = previo_pins.get(room, {})
+            guest_name = guest_info.get("guest")
+            checkin = guest_info.get("checkin")
+            checkout = guest_info.get("checkout")
+
+            # Calculate consumption for this room
+            room_logs = [
+                log for log in coord.consumption_log
+                if log.get("room") == room
+            ]
+
+            # Calculate total price
+            total_price = sum(
+                log.get("price", 0.0) * log.get("quantity", 1)
+                for log in room_logs
+            )
+
+            # Group items by name with quantities and prices
+            item_summary = {}
+            for log in room_logs:
+                item = log.get("item", "Unknown")
+                quantity = log.get("quantity", 1)
+                price = log.get("price", 0.0)
+
+                if item not in item_summary:
+                    item_summary[item] = {
+                        "quantity": 0,
+                        "unit_price": price,
+                        "total_price": 0.0
+                    }
+
+                item_summary[item]["quantity"] += quantity
+                item_summary[item]["total_price"] += price * quantity
+
+            # Add consumption data to response
+            response.update({
+                "guest_name": guest_name,
+                "checkin": checkin,
+                "checkout": checkout,
+                "total_price": round(total_price, 2),
+                "total_items": sum(log.get("quantity", 1) for log in room_logs),
+                "item_summary": item_summary,
+                "consumption_count": len(room_logs)
+            })
+
+            _LOGGER.info(
+                f"💰 Room {room} consumption: {total_price:.2f} Kč | "
+                f"Guest: {guest_name or 'N/A'} | Items: {len(item_summary)}"
+            )
+
         _LOGGER.warning(f"🔔 Firing event lednice_pin_verified with data: {response}")
         hass.bus.async_fire(f"{DOMAIN}_pin_verified", response)
 

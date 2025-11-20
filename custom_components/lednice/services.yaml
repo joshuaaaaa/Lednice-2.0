@@ -182,13 +182,26 @@ consume_products:
 
 verify_pin:
   name: Ověřit PIN
-  description: Ověří platnost PIN kódu pro self-service.
+  description: |
+    Ověří platnost PIN kódu pro self-service.
+    Vrátí informace o pokoji, hostovi a aktuální konzumaci.
+
+    Odpověď obsahuje:
+    - valid: bool - PIN je platný
+    - room: str - Název pokoje (room1-10, owner)
+    - guest_name: str - Jméno hosta z Previo
+    - checkin/checkout: str - Datumy pobytu
+    - total_price: float - Celková částka k úhradě (Kč)
+    - total_items: int - Celkový počet konzumovaných položek
+    - item_summary: dict - Rozpis položek {název: {quantity, unit_price, total_price}}
+    - consumption_count: int - Počet záznamů konzumace
+
   response:
-    description: Vrátí výsledek ověření PIN.
+    description: Vrátí výsledek ověření PIN včetně konzumace.
   fields:
     pin:
       name: PIN
-      description: PIN k ověření.
+      description: PIN k ověření (4 znaky).
       required: true
       example: "1234"
       selector:
