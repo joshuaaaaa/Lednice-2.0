@@ -1,6 +1,6 @@
 """Lednice - Fridge Inventory Manager Integration."""
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import voluptuous as vol
@@ -10,7 +10,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse, State, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.storage import Store
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 
 from .const import (
     DOMAIN,
@@ -37,6 +37,7 @@ from .const import (
     STORAGE_VERSION,
     DEFAULT_OWNER_PIN,
     OWNER_ROOM,
+    MAX_HISTORY_ENTRIES,
     PREVIO_DOMAIN,
     PREVIO_ATTR_ROOM,
     PREVIO_ATTR_CARD_KEYS,
@@ -69,12 +70,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "inventory": {},
         "room_pins": {OWNER_ROOM: DEFAULT_OWNER_PIN},  # Default owner PIN
         "consumption_log": [],
-        "product_codes": {}  # Maps product code (1-100) to {name, price, barcode}
+        "product_codes": {},  # Maps product code (1-100) to {name, price, barcode}
+        "history": []  # Complete history of all operations
     }
 
     # Ensure product_codes exists (for migration from v1)
     if "product_codes" not in data:
         data["product_codes"] = {}
+
+    # Ensure history exists (for migration)
+    if "history" not in data:
+        data["history"] = []
 
     # Ensure owner PIN exists
     if OWNER_ROOM not in data.get("room_pins", {}):
@@ -569,6 +575,10 @@ class LedniceDataCoordinator:
                 "added": datetime.now().isoformat()
             }
 
+        # Log to history
+        details = f"Code: {code}" if code else "No code"
+        self._log_history("add", item_name, quantity, "owner", details)
+
         await self._save_data()
         self._notify_listeners()
 
@@ -596,23 +606,38 @@ class LedniceDataCoordinator:
         if len(self.data["consumption_log"]) > 1000:
             self.data["consumption_log"] = self.data["consumption_log"][-1000:]
 
+        # Log to history
+        details = f"Price: {price} Kč" if price > 0 else "No price"
+        self._log_history("remove", item_name, quantity, room, details)
+
         await self._save_data()
         self._notify_listeners()
         return True
 
     async def update_item(self, item_name: str, quantity: int | None = None, code: str | None = None) -> None:
         """Update item in inventory."""
+        old_quantity = 0
         if item_name not in self.inventory:
             self.inventory[item_name] = {
                 "quantity": 0,
                 "code": "",
                 "added": datetime.now().isoformat()
             }
+        else:
+            old_quantity = self.inventory[item_name].get("quantity", 0)
 
+        details_parts = []
         if quantity is not None:
             self.inventory[item_name]["quantity"] = quantity
+            details_parts.append(f"Qty: {old_quantity} → {quantity}")
         if code is not None:
             self.inventory[item_name]["code"] = code
+            details_parts.append(f"Code: {code}")
+
+        # Log to history
+        details = ", ".join(details_parts) if details_parts else "Updated"
+        qty_change = (quantity - old_quantity) if quantity is not None else 0
+        self._log_history("update", item_name, qty_change, "owner", details)
 
         await self._save_data()
         self._notify_listeners()
@@ -646,8 +671,40 @@ class LedniceDataCoordinator:
         """Reset entire inventory."""
         self.data["inventory"] = {}
         self.data["consumption_log"] = []
+        self._log_history("reset", "all", 0, "owner", "Inventory reset")
         await self._save_data()
         self._notify_listeners()
+
+    def _log_history(self, action: str, item: str, quantity: int, room: str | None = None, details: str = "") -> None:
+        """Log an action to history."""
+        # Get guest name from Previo if available
+        guest = None
+        if room and room.startswith("room"):
+            previo_pins = self.data.get("previo_pins", {})
+            if room in previo_pins:
+                guest = previo_pins[room].get("guest")
+
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "action": action,  # add, remove, update, reset
+            "item": item,
+            "quantity": quantity,
+            "room": room,
+            "guest": guest,
+            "details": details
+        }
+
+        # Add to history
+        if "history" not in self.data:
+            self.data["history"] = []
+
+        self.data["history"].append(entry)
+
+        # Keep only last MAX_HISTORY_ENTRIES
+        if len(self.data["history"]) > MAX_HISTORY_ENTRIES:
+            self.data["history"] = self.data["history"][-MAX_HISTORY_ENTRIES:]
+
+        _LOGGER.debug(f"📝 History logged: {action} | {item} | qty={quantity} | room={room} | guest={guest}")
 
     async def _save_data(self) -> None:
         """Save data to storage."""
@@ -699,6 +756,23 @@ class LedniceDataCoordinator:
 
         # Initial extraction from all current Previo sensors
         await self._extract_all_previo_pins()
+
+        # Set up periodic cleanup of expired PINs (every 30 minutes)
+        @callback
+        def cleanup_expired_pins(now):
+            """Periodic cleanup of expired PINs."""
+            self.hass.async_create_task(self._cleanup_expired_previo_pins())
+
+        self._previo_listeners.append(
+            async_track_time_interval(
+                self.hass,
+                cleanup_expired_pins,
+                timedelta(minutes=30)
+            )
+        )
+
+        # Run initial cleanup
+        await self._cleanup_expired_previo_pins()
 
         _LOGGER.info("✅ Previo sensor monitoring set up successfully")
 
@@ -793,3 +867,44 @@ class LedniceDataCoordinator:
         # Save and notify after processing
         await self._save_data()
         self._notify_listeners()
+
+    async def _cleanup_expired_previo_pins(self) -> None:
+        """Remove Previo PINs that are expired (1 hour after checkout)."""
+        if "previo_pins" not in self.data:
+            return
+
+        current_time = datetime.now()
+        expired_rooms = []
+
+        for room, pin_data in self.data["previo_pins"].items():
+            try:
+                checkout_str = pin_data.get("checkout")
+                if not checkout_str:
+                    continue
+
+                # Parse checkout datetime
+                checkout_dt = datetime.fromisoformat(checkout_str)
+
+                # Check if more than 1 hour past checkout
+                time_since_checkout = current_time - checkout_dt
+                if time_since_checkout > timedelta(hours=1):
+                    expired_rooms.append(room)
+                    _LOGGER.info(
+                        f"🗑️ Removing expired Previo PIN: {room} | "
+                        f"guest={pin_data.get('guest')} | "
+                        f"checkout={checkout_str} | "
+                        f"expired {time_since_checkout.total_seconds() / 3600:.1f}h ago"
+                    )
+
+            except (ValueError, AttributeError) as err:
+                _LOGGER.error(f"Error parsing checkout date for {room}: {err}")
+
+        # Remove expired PINs
+        if expired_rooms:
+            for room in expired_rooms:
+                del self.data["previo_pins"][room]
+
+            await self._save_data()
+            self._notify_listeners()
+
+            _LOGGER.info(f"✅ Cleaned up {len(expired_rooms)} expired Previo PIN(s)")

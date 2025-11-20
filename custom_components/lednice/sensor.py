@@ -7,7 +7,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, ATTR_INVENTORY, ATTR_CONSUMPTION_LOG
+from .const import DOMAIN, ATTR_INVENTORY, ATTR_CONSUMPTION_LOG, ATTR_HISTORY
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,6 +23,7 @@ async def async_setup_entry(
     sensors = [
         LedniceInventorySensor(coordinator, entry),
         LedniceConsumptionSensor(coordinator, entry),
+        LedniceHistorySensor(coordinator, entry),
     ]
 
     # Add per-room consumption sensors
@@ -211,6 +212,71 @@ class LedniceRoomConsumptionSensor(SensorEntity):
             "total_price": round(total_price, 2),
             "pin_configured": self._room in self._coordinator.room_pins,
             "pin": self._coordinator.room_pins.get(self._room, "Not configured"),  # Show PIN for this room
+        }
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return True
+
+    async def async_added_to_hass(self):
+        """When entity is added to hass."""
+        self._coordinator.add_listener(self.async_write_ha_state)
+
+    async def async_will_remove_from_hass(self):
+        """When entity will be removed from hass."""
+        self._coordinator.remove_listener(self.async_write_ha_state)
+
+
+class LedniceHistorySensor(SensorEntity):
+    """Sensor for complete Lednice inventory history (add/remove/update operations)."""
+
+    def __init__(self, coordinator, entry: ConfigEntry):
+        """Initialize the sensor."""
+        self._coordinator = coordinator
+        self._entry = entry
+        self._attr_name = f"{entry.title} History"
+        self._attr_unique_id = f"{entry.entry_id}_history"
+        self._attr_icon = "mdi:history"
+
+    @property
+    def state(self) -> int:
+        """Return the total number of history entries."""
+        return len(self._coordinator.data.get("history", []))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the state attributes."""
+        history = self._coordinator.data.get("history", [])
+
+        # Return last 50 for display (most recent first)
+        recent_history = list(reversed(history[-50:])) if history else []
+
+        # Calculate statistics
+        total_added = sum(
+            entry.get("quantity", 0)
+            for entry in history
+            if entry.get("action") == "add"
+        )
+        total_removed = sum(
+            entry.get("quantity", 0)
+            for entry in history
+            if entry.get("action") == "remove"
+        )
+
+        # Group by action type
+        action_counts = {}
+        for entry in history:
+            action = entry.get("action", "unknown")
+            action_counts[action] = action_counts.get(action, 0) + 1
+
+        return {
+            ATTR_HISTORY: recent_history,
+            "total_entries": len(history),
+            "total_added": total_added,
+            "total_removed": total_removed,
+            "action_counts": action_counts,
+            "last_action": history[-1] if history else None,
         }
 
     @property
