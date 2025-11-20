@@ -376,8 +376,8 @@ async def async_setup_services(hass: HomeAssistant, coordinator: "LedniceDataCoo
         ]
         removed_count = original_count - len(coord.data["consumption_log"])
 
-        await coord.async_save()
-        coord.async_update_listeners()
+        await coord._save_data()
+        coord._notify_listeners()
 
         _LOGGER.info(f"Cleared {removed_count} consumption entries for room '{room}'")
 
