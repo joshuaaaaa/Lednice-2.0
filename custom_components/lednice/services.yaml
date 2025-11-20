@@ -193,3 +193,15 @@ verify_pin:
       example: "1234"
       selector:
         text:
+
+clear_room_consumption:
+  name: Vynulovat spotřebu pokoje
+  description: Vymaže historii spotřeby pro konkrétní pokoj (když host zaplatí).
+  fields:
+    room:
+      name: Pokoj
+      description: Název pokoje (owner, room1-room10).
+      required: true
+      example: "room1"
+      selector:
+        text:

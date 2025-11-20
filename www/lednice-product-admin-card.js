@@ -13,6 +13,7 @@ class LedniceProductAdminCard extends HTMLElement {
     this._errorMessage = '';
     this._productCodes = {};
     this._inventory = {};
+    this._roomConsumption = {};
     this._editingProduct = null;
     this._formData = {
       code: '',
@@ -44,6 +45,18 @@ class LedniceProductAdminCard extends HTMLElement {
     if (entity && entity.attributes.inventory) {
       this._inventory = entity.attributes.inventory;
     }
+
+    // Load room consumption data
+    this._roomConsumption = {};
+    ['owner', 'room1', 'room2', 'room3', 'room4', 'room5', 'room6', 'room7', 'room8', 'room9', 'room10'].forEach(room => {
+      const roomEntity = hass.states[`sensor.lednice_${room}_consumption`];
+      if (roomEntity) {
+        this._roomConsumption[room] = {
+          total_price: roomEntity.attributes.total_price || 0,
+          item_count: Object.keys(roomEntity.attributes.item_statistics || {}).length
+        };
+      }
+    });
 
     // Check session timeout
     if (this._authenticated && this._sessionTimestamp) {
@@ -286,6 +299,19 @@ class LedniceProductAdminCard extends HTMLElement {
     this.render();
   }
 
+  _clearRoomConsumption(room) {
+    if (confirm(`Opravdu chcete vynulovat spotřebu pro ${room}?`)) {
+      this._hass.callService('lednice', 'clear_room_consumption', {
+        room: room
+      }).then(() => {
+        alert(`Spotřeba pro ${room} byla vynulována!`);
+        this.render();
+      }).catch((err) => {
+        alert('Chyba při nulování spotřeby: ' + err.message);
+      });
+    }
+  }
+
   render() {
     if (!this._config || !this._hass) return;
 
@@ -499,6 +525,70 @@ class LedniceProductAdminCard extends HTMLElement {
 
         .btn-secondary:hover {
           background: var(--divider-color);
+        }
+
+        .btn-danger {
+          background: #f44336;
+          color: white;
+          padding: 8px 16px;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .btn-danger:hover {
+          background: #d32f2f;
+        }
+
+        .room-consumption-section {
+          margin-bottom: 24px;
+          background: var(--secondary-background-color);
+          padding: 20px;
+          border-radius: 12px;
+        }
+
+        .section-header {
+          font-size: 18px;
+          font-weight: 600;
+          color: var(--primary-text-color);
+          margin-bottom: 16px;
+        }
+
+        .room-list {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .room-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 16px;
+          background: var(--card-background-color);
+          border-radius: 8px;
+          border: 2px solid var(--divider-color);
+        }
+
+        .room-details {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .room-name {
+          font-size: 16px;
+          font-weight: 600;
+          color: var(--primary-text-color);
+        }
+
+        .room-price {
+          font-size: 20px;
+          font-weight: 700;
+          color: #4CAF50;
         }
 
         .product-list {
@@ -764,6 +854,23 @@ class LedniceProductAdminCard extends HTMLElement {
           </div>
         </div>
 
+        <div class="room-consumption-section">
+          <div class="section-header">💰 Spotřeba pokojů</div>
+          <div class="room-list">
+            ${Object.entries(this._roomConsumption)
+              .filter(([_, data]) => data.total_price > 0)
+              .map(([room, data]) => `
+                <div class="room-item">
+                  <div class="room-details">
+                    <div class="room-name">${room === 'owner' ? '👑 Vlastník' : `🏠 ${room.replace('room', 'Pokoj ')}`}</div>
+                    <div class="room-price">${data.total_price.toFixed(2)} Kč</div>
+                  </div>
+                  <button class="btn btn-danger" data-action="clear-room" data-room="${room}">Vynulovat</button>
+                </div>
+              `).join('') || '<div class="empty-state">Žádná spotřeba</div>'}
+          </div>
+        </div>
+
         <div class="product-list">
           <div class="product-list-header">📦 Seznam produktů (${Object.keys(this._productCodes).length}/100)</div>
           ${productList || '<div class="empty-state"><div class="empty-state-icon">📭</div><div>Zatím nejsou žádné produkty</div></div>'}
@@ -796,6 +903,7 @@ class LedniceProductAdminCard extends HTMLElement {
       btn.addEventListener('click', (e) => {
         const action = e.target.dataset.action;
         const code = e.target.dataset.code;
+        const room = e.target.dataset.room;
 
         switch (action) {
           case 'submit':
@@ -812,6 +920,9 @@ class LedniceProductAdminCard extends HTMLElement {
             break;
           case 'logout':
             this._logout();
+            break;
+          case 'clear-room':
+            this._clearRoomConsumption(room);
             break;
         }
       });

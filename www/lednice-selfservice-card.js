@@ -16,7 +16,6 @@ class LedniceSelfServiceCard extends HTMLElement {
     this._pin = '';
     this._cart = {};
     this._productCodes = {};
-    this._inventory = {};
     this._inactivityTimer = null;
     this._inactivityTimeout = 60000;
     this._failedAttempts = 0;
@@ -49,10 +48,7 @@ class LedniceSelfServiceCard extends HTMLElement {
     if (inventoryEntity && inventoryEntity.attributes.product_codes) {
       this._productCodes = inventoryEntity.attributes.product_codes;
     }
-    if (inventoryEntity && inventoryEntity.attributes.inventory) {
-      this._inventory = inventoryEntity.attributes.inventory;
-    }
-    
+
     // Setup event listener NOW that we have hass
     this._setupEventListener();
   }
@@ -482,30 +478,9 @@ class LedniceSelfServiceCard extends HTMLElement {
           font-size: 40px;
         }
         .product-code {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-          align-items: center;
-        }
-        .stock-badge {
-          font-size: 11px;
-          font-weight: 700;
-          padding: 3px 6px;
-          border-radius: 4px;
-          min-width: 40px;
-          text-align: center;
-        }
-        .stock-badge.in-stock {
-          background: #4CAF50;
-          color: white;
-        }
-        .stock-badge.out-of-stock {
-          background: #f44336;
-          color: white;
-        }
-        .product-number {
-          font-size: 10px;
+          font-size: 12px;
           color: var(--secondary-text-color);
+          font-weight: bold;
         }
         .product-name {
           font-size: 13px;
@@ -648,10 +623,6 @@ class LedniceSelfServiceCard extends HTMLElement {
       const inCart = this._cart[i] || 0;
       const imagePath = `/local/lednice/products/${i}.png`;
 
-      // Find inventory quantity by product name
-      const inventoryItem = this._inventory[name];
-      const stockQuantity = inventoryItem ? inventoryItem.quantity : 0;
-
       html += `
         <div class="product-card ${inCart > 0 ? 'in-cart' : ''}" data-product="${i}">
           ${inCart > 0 ? `<div class="product-quantity">${inCart}</div>` : ''}
@@ -662,10 +633,7 @@ class LedniceSelfServiceCard extends HTMLElement {
             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
           />
           <div class="product-image" style="display: none;">📦</div>
-          <div class="product-code">
-            <div class="stock-badge ${stockQuantity > 0 ? 'in-stock' : 'out-of-stock'}">${stockQuantity} ks</div>
-            <div class="product-number">#${i}</div>
-          </div>
+          <div class="product-code">#${i}</div>
           <div class="product-name">${name}</div>
           ${price > 0 ? `<div class="product-price">${price} Kč</div>` : ''}
         </div>
