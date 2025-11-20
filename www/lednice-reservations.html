@@ -12,63 +12,204 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Animated background circles */
+        body::before, body::after {
+            content: '';
+            position: fixed;
+            border-radius: 50%;
+            z-index: 0;
+            pointer-events: none;
+            animation: float 20s infinite ease-in-out;
+        }
+
+        body::before {
+            width: 400px;
+            height: 400px;
+            background: rgba(255, 255, 255, 0.1);
+            top: -100px;
+            right: -100px;
+            animation-delay: 0s;
+        }
+
+        body::after {
+            width: 300px;
+            height: 300px;
+            background: rgba(255, 255, 255, 0.08);
+            bottom: -50px;
+            left: -50px;
+            animation-delay: 5s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -30px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
+            position: relative;
+            z-index: 1;
         }
 
+        /* Glassmorphism header */
         .header {
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             margin-bottom: 30px;
             text-align: center;
+            animation: slideDown 0.6s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .header h1 {
-            color: #667eea;
-            font-size: 2.5em;
+            color: white;
+            font-size: 3em;
+            font-weight: 800;
             margin-bottom: 10px;
+            text-shadow: 0 2px 20px rgba(0, 0, 0, 0.2);
+            letter-spacing: -1px;
         }
 
         .header .subtitle {
-            color: #666;
-            font-size: 1.1em;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.2em;
+            font-weight: 500;
         }
 
         .header .last-update {
-            color: #999;
+            color: rgba(255, 255, 255, 0.7);
             font-size: 0.9em;
-            margin-top: 10px;
+            margin-top: 15px;
+            display: inline-block;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            animation: fadeIn 0.8s ease 0.2s both;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 25px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+        }
+
+        .stat-icon {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: 800;
+            color: white;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: rgba(255, 255, 255, 0.8);
+            margin-top: 5px;
+            font-weight: 500;
         }
 
         .reservations-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 25px;
             margin-bottom: 30px;
         }
 
         .reservation-card {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 24px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             position: relative;
             overflow: hidden;
+            animation: cardEntry 0.6s ease both;
+        }
+
+        .reservation-card:nth-child(1) { animation-delay: 0.1s; }
+        .reservation-card:nth-child(2) { animation-delay: 0.2s; }
+        .reservation-card:nth-child(3) { animation-delay: 0.3s; }
+        .reservation-card:nth-child(4) { animation-delay: 0.4s; }
+        .reservation-card:nth-child(5) { animation-delay: 0.5s; }
+        .reservation-card:nth-child(6) { animation-delay: 0.6s; }
+
+        @keyframes cardEntry {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
         }
 
         .reservation-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
         }
 
         .reservation-card::before {
@@ -77,127 +218,254 @@
             top: 0;
             left: 0;
             width: 100%;
-            height: 5px;
+            height: 6px;
             background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 24px 24px 0 0;
         }
 
-        .room-number {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #667eea;
-            margin-bottom: 15px;
+        /* Gradient glow on hover */
+        .reservation-card::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 24px;
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .reservation-card:hover::after {
+            opacity: 0.3;
+            filter: blur(20px);
+        }
+
+        .room-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .room-number {
+            font-size: 1.8em;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .room-icon {
-            font-size: 1.8em;
+            font-size: 2.5em;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
         }
 
         .guest-name {
-            font-size: 1.3em;
-            color: #333;
-            margin-bottom: 20px;
-            font-weight: 600;
+            font-size: 1.4em;
+            color: #2d3748;
+            margin-bottom: 25px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .guest-name::before {
+            content: '👤';
+            font-size: 1.2em;
+        }
+
+        .info-grid {
+            display: grid;
+            gap: 15px;
         }
 
         .info-row {
             display: flex;
             align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid #f0f0f0;
+            padding: 15px;
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-radius: 16px;
+            transition: all 0.3s ease;
         }
 
-        .info-row:last-child {
-            border-bottom: none;
+        .info-row:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         }
 
         .info-icon {
-            font-size: 1.2em;
-            margin-right: 10px;
-            min-width: 25px;
+            font-size: 1.5em;
+            margin-right: 15px;
+            min-width: 30px;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
         }
 
         .info-label {
-            color: #666;
-            font-size: 0.9em;
-            margin-right: 10px;
+            color: #718096;
+            font-size: 0.95em;
+            font-weight: 600;
+            margin-right: 15px;
         }
 
         .info-value {
-            color: #333;
-            font-weight: 600;
+            color: #2d3748;
+            font-weight: 700;
             margin-left: auto;
+            font-size: 1.05em;
         }
 
         .pin-code {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 8px 15px;
-            border-radius: 8px;
-            font-size: 1.2em;
-            letter-spacing: 2px;
-            font-weight: bold;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 1.3em;
+            letter-spacing: 3px;
+            font-weight: 800;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            font-family: 'Courier New', monospace;
         }
 
         .consumption {
-            background: #e8f5e9;
-            color: #2e7d32;
-            padding: 8px 15px;
-            border-radius: 8px;
-            font-weight: bold;
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 1.2em;
+            box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4);
         }
 
         .empty-state {
-            background: white;
-            border-radius: 15px;
-            padding: 60px 40px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 24px;
+            padding: 80px 40px;
             text-align: center;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            animation: fadeIn 0.8s ease;
         }
 
         .empty-state .icon {
-            font-size: 5em;
-            margin-bottom: 20px;
-            opacity: 0.3;
+            font-size: 6em;
+            margin-bottom: 25px;
+            opacity: 0.6;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
         }
 
         .empty-state h2 {
-            color: #666;
-            font-size: 1.8em;
-            margin-bottom: 10px;
+            color: white;
+            font-size: 2em;
+            font-weight: 700;
+            margin-bottom: 15px;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
         }
 
         .empty-state p {
-            color: #999;
-            font-size: 1.1em;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1.2em;
+            font-weight: 500;
         }
 
         .error-message {
-            background: #ffebee;
-            color: #c62828;
-            padding: 20px;
-            border-radius: 10px;
+            background: rgba(254, 178, 178, 0.95);
+            backdrop-filter: blur(20px);
+            color: #742a2a;
+            padding: 30px;
+            border-radius: 20px;
             text-align: center;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 32px rgba(220, 38, 38, 0.2);
+            border: 2px solid rgba(220, 38, 38, 0.3);
+            animation: shake 0.5s ease;
         }
 
-        @media (max-width: 768px) {
-            .reservations-grid {
-                grid-template-columns: 1fr;
-            }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
 
-            .header h1 {
-                font-size: 2em;
-            }
+        .error-message h2 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
         }
 
         .loading {
             text-align: center;
-            padding: 40px;
+            padding: 60px 40px;
             color: white;
             font-size: 1.5em;
+            font-weight: 600;
+        }
+
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .reservations-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-card {
+                padding: 20px;
+            }
+
+            .reservation-card {
+                padding: 25px;
+            }
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
         }
     </style>
 </head>
@@ -205,12 +473,30 @@
     <div class="container">
         <div class="header">
             <h1>🏨 Aktivní Rezervace</h1>
-            <div class="subtitle">Přehled rezervací v Lednici</div>
-            <div class="last-update" id="lastUpdate">Aktualizováno: --</div>
+            <div class="subtitle">Přehled rezervací v reálném čase</div>
+            <div class="last-update" id="lastUpdate">Načítání...</div>
+        </div>
+
+        <div class="stats-bar" id="statsBar" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-icon">🚪</div>
+                <div class="stat-value" id="statRooms">0</div>
+                <div class="stat-label">Aktivní pokoje</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-value" id="statGuests">0</div>
+                <div class="stat-label">Hosté</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">💰</div>
+                <div class="stat-value" id="statRevenue">0 Kč</div>
+                <div class="stat-label">Celková konzumace</div>
+            </div>
         </div>
 
         <div id="content">
-            <div class="loading">Načítání dat...</div>
+            <div class="loading">Načítání dat</div>
         </div>
     </div>
 
@@ -218,11 +504,10 @@
         // Configuration
         const CONFIG = {
             homeAssistantUrl: window.location.origin,
-            updateInterval: 30000, // 30 seconds
+            updateInterval: 30000,
             inventorySensor: 'sensor.lednice_inventory'
         };
 
-        // Get Home Assistant auth token from URL or local storage
         function getAuthToken() {
             const urlParams = new URLSearchParams(window.location.search);
             const tokenFromUrl = urlParams.get('token');
@@ -235,7 +520,6 @@
             return localStorage.getItem('ha_token');
         }
 
-        // Fetch data from Home Assistant API
         async function fetchHomeAssistantData() {
             const token = getAuthToken();
 
@@ -244,7 +528,6 @@
             }
 
             try {
-                // Fetch inventory sensor
                 const inventoryResponse = await fetch(
                     `${CONFIG.homeAssistantUrl}/api/states/${CONFIG.inventorySensor}`,
                     {
@@ -261,7 +544,6 @@
 
                 const inventoryData = await inventoryResponse.json();
 
-                // Fetch all room consumption sensors
                 const roomConsumption = {};
                 for (let i = 1; i <= 10; i++) {
                     const roomSensorId = `sensor.lednice_room${i}_consumption`;
@@ -296,7 +578,6 @@
             }
         }
 
-        // Format date for display
         function formatDate(dateString) {
             if (!dateString) return 'N/A';
             try {
@@ -311,7 +592,6 @@
             }
         }
 
-        // Check if reservation is active today
         function isActiveToday(checkin, checkout) {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -329,15 +609,30 @@
             }
         }
 
-        // Render reservations
+        function updateStatistics(activeReservations, roomConsumption) {
+            const statsBar = document.getElementById('statsBar');
+            const totalRooms = activeReservations.length;
+            const totalGuests = activeReservations.length;
+            const totalRevenue = activeReservations.reduce((sum, [room, pinData]) => {
+                return sum + (roomConsumption[room] || 0);
+            }, 0);
+
+            document.getElementById('statRooms').textContent = totalRooms;
+            document.getElementById('statGuests').textContent = totalGuests;
+            document.getElementById('statRevenue').textContent = `${Math.round(totalRevenue)} Kč`;
+
+            statsBar.style.display = totalRooms > 0 ? 'grid' : 'none';
+        }
+
         function renderReservations(data) {
             const content = document.getElementById('content');
             const { previo_pins, roomConsumption } = data;
 
-            // Filter active reservations
             const activeReservations = Object.entries(previo_pins).filter(([room, pinData]) => {
                 return isActiveToday(pinData.checkin, pinData.checkout);
             });
+
+            updateStatistics(activeReservations, roomConsumption);
 
             if (activeReservations.length === 0) {
                 content.innerHTML = `
@@ -350,7 +645,6 @@
                 return;
             }
 
-            // Sort by room number
             activeReservations.sort((a, b) => {
                 const roomA = parseInt(a[0].replace('room', ''));
                 const roomB = parseInt(b[0].replace('room', ''));
@@ -363,37 +657,39 @@
 
                 return `
                     <div class="reservation-card">
-                        <div class="room-number">
-                            <span>🚪 Pokoj ${roomNumber}</span>
-                            <span class="room-icon">🛏️</span>
+                        <div class="room-header">
+                            <div class="room-number">Pokoj ${roomNumber}</div>
+                            <div class="room-icon">🛏️</div>
                         </div>
 
                         <div class="guest-name">
-                            👤 ${pinData.guest || 'Neznámý host'}
+                            ${pinData.guest || 'Neznámý host'}
                         </div>
 
-                        <div class="info-row">
-                            <span class="info-icon">🔑</span>
-                            <span class="info-label">PIN:</span>
-                            <span class="pin-code">${pinData.pin}</span>
-                        </div>
+                        <div class="info-grid">
+                            <div class="info-row">
+                                <span class="info-icon">🔑</span>
+                                <span class="info-label">PIN kód</span>
+                                <span class="pin-code">${pinData.pin}</span>
+                            </div>
 
-                        <div class="info-row">
-                            <span class="info-icon">📥</span>
-                            <span class="info-label">Check-in:</span>
-                            <span class="info-value">${formatDate(pinData.checkin)}</span>
-                        </div>
+                            <div class="info-row">
+                                <span class="info-icon">📥</span>
+                                <span class="info-label">Check-in</span>
+                                <span class="info-value">${formatDate(pinData.checkin)}</span>
+                            </div>
 
-                        <div class="info-row">
-                            <span class="info-icon">📤</span>
-                            <span class="info-label">Check-out:</span>
-                            <span class="info-value">${formatDate(pinData.checkout)}</span>
-                        </div>
+                            <div class="info-row">
+                                <span class="info-icon">📤</span>
+                                <span class="info-label">Check-out</span>
+                                <span class="info-value">${formatDate(pinData.checkout)}</span>
+                            </div>
 
-                        <div class="info-row">
-                            <span class="info-icon">💰</span>
-                            <span class="info-label">Konzumace:</span>
-                            <span class="consumption">${consumption.toFixed(0)} Kč</span>
+                            <div class="info-row">
+                                <span class="info-icon">💰</span>
+                                <span class="info-label">Konzumace</span>
+                                <span class="consumption">${consumption.toFixed(0)} Kč</span>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -405,25 +701,22 @@
                 </div>
             `;
 
-            // Update last update time
             const now = new Date();
             document.getElementById('lastUpdate').textContent =
                 `Aktualizováno: ${now.toLocaleTimeString('cs-CZ')}`;
         }
 
-        // Show error
         function showError(message) {
             const content = document.getElementById('content');
             content.innerHTML = `
                 <div class="error-message">
                     <h2>❌ Chyba při načítání dat</h2>
                     <p>${message}</p>
-                    <p style="margin-top: 10px;">Zkontrolujte, zda máte správný token v URL: ?token=YOUR_TOKEN</p>
+                    <p style="margin-top: 15px; font-size: 0.9em;">Zkontrolujte, zda máte správný token v URL: ?token=YOUR_TOKEN</p>
                 </div>
             `;
         }
 
-        // Update dashboard
         async function updateDashboard() {
             try {
                 const data = await fetchHomeAssistantData();
@@ -433,7 +726,6 @@
             }
         }
 
-        // Initialize
         updateDashboard();
         setInterval(updateDashboard, CONFIG.updateInterval);
     </script>
