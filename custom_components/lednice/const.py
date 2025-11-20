@@ -46,3 +46,11 @@ MAX_PRODUCT_CODE = 100
 # Storage
 STORAGE_KEY = "lednice_storage"
 STORAGE_VERSION = 1
+
+# Previo integration
+PREVIO_DOMAIN = "previo_v4"
+PREVIO_ATTR_ROOM = "room"
+PREVIO_ATTR_CARD_KEYS = "card_keys"
+PREVIO_ATTR_CHECKIN = "checkin"
+PREVIO_ATTR_CHECKOUT = "checkout"
+PREVIO_ATTR_GUEST = "guest"

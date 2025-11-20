@@ -7,9 +7,10 @@ import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse, State, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers.event import async_track_state_change_event
 
 from .const import (
     DOMAIN,
@@ -36,6 +37,12 @@ from .const import (
     STORAGE_VERSION,
     DEFAULT_OWNER_PIN,
     OWNER_ROOM,
+    PREVIO_DOMAIN,
+    PREVIO_ATTR_ROOM,
+    PREVIO_ATTR_CARD_KEYS,
+    PREVIO_ATTR_CHECKIN,
+    PREVIO_ATTR_CHECKOUT,
+    PREVIO_ATTR_GUEST,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -86,6 +93,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = LedniceDataCoordinator(hass, store, data, entry)
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
+    # Setup Previo sensor monitoring
+    await coordinator.setup_previo_monitoring()
+
     # Setup platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -100,6 +110,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if unload_ok:
+        # Remove Previo listeners
+        coordinator = hass.data[DOMAIN].get(entry.entry_id)
+        if coordinator and hasattr(coordinator, '_previo_listeners'):
+            for listener in coordinator._previo_listeners:
+                listener()
+            coordinator._previo_listeners.clear()
+
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
@@ -470,6 +487,7 @@ class LedniceDataCoordinator:
         self.data = data
         self.entry = entry
         self._listeners = []
+        self._previo_listeners = []
 
     @property
     def inventory(self) -> dict:
@@ -492,10 +510,39 @@ class LedniceDataCoordinator:
         return self.data.get("product_codes", {})
 
     def get_room_by_pin(self, pin: str) -> str | None:
-        """Get room name by PIN."""
+        """Get room name by PIN, checking Previo pins first (with validity), then fallback to static pins."""
+        # First check Previo pins with validity
+        previo_pins = self.data.get("previo_pins", {})
+        current_date = datetime.now().date()
+
+        for room, pin_data in previo_pins.items():
+            if pin_data.get("pin") == pin:
+                # Check validity
+                try:
+                    checkin = datetime.fromisoformat(pin_data.get("checkin", "")).date()
+                    checkout = datetime.fromisoformat(pin_data.get("checkout", "")).date()
+
+                    # PIN is valid if current date is between checkin and checkout (inclusive)
+                    if checkin <= current_date <= checkout:
+                        _LOGGER.info(
+                            f"🔐 Previo PIN verified: room={room}, pin={pin}, guest={pin_data.get('guest')}, "
+                            f"valid {checkin} to {checkout}"
+                        )
+                        return room
+                    else:
+                        _LOGGER.warning(
+                            f"🔐 Previo PIN expired: room={room}, pin={pin}, "
+                            f"valid {checkin} to {checkout}, current={current_date}"
+                        )
+                except (ValueError, AttributeError) as err:
+                    _LOGGER.error(f"Error parsing Previo PIN dates for room {room}: {err}")
+
+        # Fallback to static room PINs
         for room, room_pin in self.room_pins.items():
             if room_pin == pin:
+                _LOGGER.info(f"🔐 Static PIN verified: room={room}, pin={pin}")
                 return room
+
         return None
 
     def get_item_by_code(self, code: str) -> str | None:
@@ -619,3 +666,130 @@ class LedniceDataCoordinator:
         """Notify all listeners of data update."""
         for listener in self._listeners:
             listener()
+
+    async def setup_previo_monitoring(self) -> None:
+        """Set up monitoring of Previo sensors."""
+        # Initialize previo_pins if not exists
+        if "previo_pins" not in self.data:
+            self.data["previo_pins"] = {}
+
+        # Get all Previo sensors
+        _LOGGER.info("🔍 Setting up Previo sensor monitoring...")
+
+        # Track all sensor state changes for previo_v4 domain
+        @callback
+        def previo_state_change_listener(event):
+            """Handle Previo sensor state changes."""
+            entity_id = event.data.get("entity_id")
+            new_state = event.data.get("new_state")
+
+            if not entity_id or not new_state:
+                return
+
+            # Only process previo_v4 sensors
+            if not entity_id.startswith(f"sensor.{PREVIO_DOMAIN}"):
+                return
+
+            self.hass.async_create_task(self._handle_previo_state_change(entity_id, new_state))
+
+        # Subscribe to all state changes
+        self._previo_listeners.append(
+            self.hass.bus.async_listen("state_changed", previo_state_change_listener)
+        )
+
+        # Initial extraction from all current Previo sensors
+        await self._extract_all_previo_pins()
+
+        _LOGGER.info("✅ Previo sensor monitoring set up successfully")
+
+    async def _handle_previo_state_change(self, entity_id: str, new_state: State) -> None:
+        """Handle a Previo sensor state change."""
+        if new_state is None or new_state.state in ["unavailable", "unknown"]:
+            return
+
+        # Extract PIN from this sensor
+        await self._extract_previo_pins_from_sensor(entity_id, new_state)
+
+    async def _extract_all_previo_pins(self) -> None:
+        """Extract PINs from all current Previo sensors."""
+        _LOGGER.info("🔍 Extracting PINs from all Previo sensors...")
+
+        # Get all sensor entities
+        for state in self.hass.states.async_all("sensor"):
+            if state.entity_id.startswith(f"sensor.{PREVIO_DOMAIN}"):
+                await self._extract_previo_pins_from_sensor(state.entity_id, state)
+
+        await self._save_data()
+        self._notify_listeners()
+
+        _LOGGER.info(f"✅ Previo PIN extraction complete. Found {len(self.data.get('previo_pins', {}))} active reservations")
+
+    async def _extract_previo_pins_from_sensor(self, entity_id: str, state: State) -> None:
+        """Extract PINs from a single Previo sensor."""
+        if not state or not state.attributes:
+            return
+
+        # Get room attribute
+        room_attr = state.attributes.get(PREVIO_ATTR_ROOM)
+        if not room_attr:
+            return
+
+        # Parse room number(s) - can be string like "1" or "1, 2" for multiple rooms
+        room_str = str(room_attr)
+        room_numbers = [r.strip() for r in room_str.split(",")]
+
+        # Get card_keys attribute
+        card_keys = state.attributes.get(PREVIO_ATTR_CARD_KEYS)
+        if not card_keys or not isinstance(card_keys, list):
+            # Try single card_key as fallback
+            single_key = state.attributes.get("card_key")
+            if single_key:
+                card_keys = [single_key]
+            else:
+                return
+
+        # Get checkin/checkout dates
+        checkin = state.attributes.get(PREVIO_ATTR_CHECKIN)
+        checkout = state.attributes.get(PREVIO_ATTR_CHECKOUT)
+        guest = state.attributes.get(PREVIO_ATTR_GUEST, "Unknown")
+
+        if not checkin or not checkout:
+            _LOGGER.warning(f"Previo sensor {entity_id} missing checkin/checkout dates")
+            return
+
+        # Map each room number (1-10) to corresponding PIN from card_keys
+        for i, room_num in enumerate(room_numbers):
+            try:
+                # Validate room number is 1-10
+                room_int = int(room_num)
+                if not 1 <= room_int <= 10:
+                    _LOGGER.warning(f"Previo sensor {entity_id} has invalid room number: {room_num}")
+                    continue
+
+                # Get corresponding PIN (if exists)
+                if i < len(card_keys):
+                    pin = str(card_keys[i]).strip()
+                    if not pin:
+                        continue
+
+                    # Store in previo_pins
+                    room_key = f"room{room_int}"
+                    self.data["previo_pins"][room_key] = {
+                        "pin": pin,
+                        "checkin": checkin,
+                        "checkout": checkout,
+                        "guest": guest,
+                        "sensor": entity_id
+                    }
+
+                    _LOGGER.info(
+                        f"📌 Previo PIN updated: {room_key} -> PIN={pin}, "
+                        f"guest={guest}, valid {checkin} to {checkout}"
+                    )
+
+            except (ValueError, IndexError) as err:
+                _LOGGER.error(f"Error processing room {room_num} from {entity_id}: {err}")
+
+        # Save and notify after processing
+        await self._save_data()
+        self._notify_listeners()

@@ -67,7 +67,8 @@ class LedniceInventorySensor(SensorEntity):
                 for name, data in self._coordinator.inventory.items()
             ],
             "product_codes": self._coordinator.product_codes,
-            "room_pins": self._coordinator.room_pins,  # Show all room PINs for admin
+            "room_pins": self._coordinator.room_pins,  # Show all static room PINs for admin
+            "previo_pins": self._coordinator.data.get("previo_pins", {}),  # Show active Previo reservations with PINs
         }
 
     @property
