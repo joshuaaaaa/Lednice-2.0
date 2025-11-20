@@ -18,6 +18,7 @@ SERVICE_ADD_PRODUCT_CODE = "add_product_code"
 SERVICE_REMOVE_PRODUCT_CODE = "remove_product_code"
 SERVICE_CONSUME_PRODUCTS = "consume_products"
 SERVICE_VERIFY_PIN = "verify_pin"
+SERVICE_CLEAR_ROOM_CONSUMPTION = "clear_room_consumption"
 
 # Attributes
 ATTR_ITEM_NAME = "item_name"

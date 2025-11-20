@@ -22,6 +22,7 @@ from .const import (
     SERVICE_REMOVE_PRODUCT_CODE,
     SERVICE_CONSUME_PRODUCTS,
     SERVICE_VERIFY_PIN,
+    SERVICE_CLEAR_ROOM_CONSUMPTION,
     ATTR_ITEM_NAME,
     ATTR_QUANTITY,
     ATTR_CODE,
@@ -335,6 +336,28 @@ async def async_setup_services(hass: HomeAssistant, coordinator: "LedniceDataCoo
         # Return response data directly to the service caller
         return response
 
+    async def handle_clear_room_consumption(call: ServiceCall) -> None:
+        """Handle clear room consumption service."""
+        coord = get_coordinator()
+        if not coord:
+            _LOGGER.error("No Lednice coordinator found")
+            return
+
+        room = call.data.get(ATTR_ROOM)
+
+        # Remove all consumption log entries for this room
+        original_count = len(coord.data.get("consumption_log", []))
+        coord.data["consumption_log"] = [
+            entry for entry in coord.data.get("consumption_log", [])
+            if entry.get("room") != room
+        ]
+        removed_count = original_count - len(coord.data["consumption_log"])
+
+        await coord.async_save()
+        coord.async_update_listeners()
+
+        _LOGGER.info(f"Cleared {removed_count} consumption entries for room '{room}'")
+
     # Register services
     hass.services.async_register(
         DOMAIN,
@@ -425,6 +448,15 @@ async def async_setup_services(hass: HomeAssistant, coordinator: "LedniceDataCoo
             vol.Required(ATTR_PIN): cv.string,
         }),
         supports_response=SupportsResponse.OPTIONAL
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CLEAR_ROOM_CONSUMPTION,
+        handle_clear_room_consumption,
+        schema=vol.Schema({
+            vol.Required(ATTR_ROOM): cv.string,
+        })
     )
 
 
