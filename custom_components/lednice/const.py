@@ -33,6 +33,7 @@ ATTR_PRODUCT_NAME = "product_name"
 ATTR_PRICE = "price"
 ATTR_PRODUCTS = "products"
 ATTR_TOTAL_PRICE = "total_price"
+ATTR_HISTORY = "history"
 
 # Default values
 DEFAULT_ROOMS = ["room1", "room2", "room3", "room4", "room5", "room6", "room7", "room8", "room9", "room10"]
@@ -46,6 +47,9 @@ MAX_PRODUCT_CODE = 100
 # Storage
 STORAGE_KEY = "lednice_storage"
 STORAGE_VERSION = 1
+
+# History
+MAX_HISTORY_ENTRIES = 200
 
 # Previo integration
 PREVIO_DOMAIN = "previo_v4"
