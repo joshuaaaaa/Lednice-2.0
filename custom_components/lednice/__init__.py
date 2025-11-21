@@ -551,10 +551,20 @@ class LedniceDataCoordinator:
         self._previo_listeners = []
 
     @staticmethod
-    def _parse_date(date_string: str) -> datetime | None:
-        """Parse date from various formats (ISO, Previo format, etc.)."""
-        if not date_string:
+    def _parse_date(date_input) -> datetime | None:
+        """Parse date from various formats (ISO, Previo format, etc.) or return datetime object."""
+        if not date_input:
             return None
+
+        # If already a datetime object, return it
+        if isinstance(date_input, datetime):
+            return date_input
+
+        # If not a string, convert to string
+        if not isinstance(date_input, str):
+            date_string = str(date_input)
+        else:
+            date_string = date_input
 
         # List of formats to try
         formats = [
@@ -568,18 +578,18 @@ class LedniceDataCoordinator:
         # Try ISO format first (fastest)
         try:
             return datetime.fromisoformat(date_string)
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError, TypeError):
             pass
 
         # Try other formats
         for fmt in formats:
             try:
                 return datetime.strptime(date_string, fmt)
-            except (ValueError, AttributeError):
+            except (ValueError, AttributeError, TypeError):
                 continue
 
         # If all fails, log warning and return None
-        _LOGGER.warning(f"Could not parse date string: {date_string}")
+        _LOGGER.warning(f"Could not parse date: {date_input} (type: {type(date_input)})")
         return None
 
     @property
@@ -603,7 +613,7 @@ class LedniceDataCoordinator:
         return self.data.get("product_codes", {})
 
     def get_room_by_pin(self, pin: str) -> str | None:
-        """Get room name by PIN, checking Previo pins first (with validity), then fallback to static pins."""
+        """Get room name by PIN, checking Previo pins first (with validity), then previo input_text, then fallback to static pins."""
         # First check Previo pins with validity
         previo_pins = self.data.get("previo_pins", {})
         current_time = datetime.now()
@@ -611,6 +621,23 @@ class LedniceDataCoordinator:
         _LOGGER.warning(f"🔍 PIN CHECK: Checking PIN '{pin}' against {len(previo_pins)} Previo reservations")
         _LOGGER.warning(f"🔍 Current time: {current_time}")
         _LOGGER.warning(f"🔍 Available Previo PINs: {[(room, data.get('pin')) for room, data in previo_pins.items()]}")
+
+        # Also check input_text.previo_used_pins_simple_X entities as fallback
+        for room_num in range(1, 11):
+            input_text_entity = f"input_text.previo_used_pins_simple_{room_num}"
+            state = self.hass.states.get(input_text_entity)
+            if state and state.state and state.state == pin:
+                room_key = f"room{room_num}"
+                _LOGGER.warning(f"✅ PIN found in {input_text_entity}, matched to {room_key}")
+                # If found in input_text, check if we also have it in previo_pins with valid dates
+                if room_key in previo_pins:
+                    _LOGGER.warning(f"🔍 Found matching Previo reservation for {room_key}, will validate time")
+                    # Continue to normal validation below
+                    break
+                else:
+                    # No Previo data, accept PIN from input_text without time validation
+                    _LOGGER.warning(f"✅ Accepting PIN from input_text (no time validation)")
+                    return room_key
 
         for room, pin_data in previo_pins.items():
             stored_pin = pin_data.get("pin")
@@ -965,16 +992,31 @@ class LedniceDataCoordinator:
 
         _LOGGER.warning(f"🔍 Final card_keys to use: {card_keys}")
 
-        # Get checkin/checkout dates
-        checkin = state.attributes.get(PREVIO_ATTR_CHECKIN)
-        checkout = state.attributes.get(PREVIO_ATTR_CHECKOUT)
+        # Get checkin/checkout dates (could be string or datetime object)
+        checkin_raw = state.attributes.get(PREVIO_ATTR_CHECKIN)
+        checkout_raw = state.attributes.get(PREVIO_ATTR_CHECKOUT)
         guest = state.attributes.get(PREVIO_ATTR_GUEST, "Unknown")
 
-        _LOGGER.warning(f"🔍 Checkin: {checkin}, Checkout: {checkout}, Guest: {guest}")
+        _LOGGER.warning(f"🔍 Checkin (raw): {checkin_raw} (type: {type(checkin_raw)})")
+        _LOGGER.warning(f"🔍 Checkout (raw): {checkout_raw} (type: {type(checkout_raw)})")
+        _LOGGER.warning(f"🔍 Guest: {guest}")
 
-        if not checkin or not checkout:
+        if not checkin_raw or not checkout_raw:
             _LOGGER.warning(f"⚠️ Previo sensor {entity_id} missing checkin/checkout dates")
             return
+
+        # Convert to ISO string if datetime object (for consistent storage)
+        if isinstance(checkin_raw, datetime):
+            checkin = checkin_raw.isoformat()
+        else:
+            checkin = str(checkin_raw) if checkin_raw else None
+
+        if isinstance(checkout_raw, datetime):
+            checkout = checkout_raw.isoformat()
+        else:
+            checkout = str(checkout_raw) if checkout_raw else None
+
+        _LOGGER.warning(f"🔍 Converted - Checkin: {checkin}, Checkout: {checkout}")
 
         # Map each room number (1-10) to corresponding PIN from card_keys
         for i, room_num in enumerate(room_numbers):
