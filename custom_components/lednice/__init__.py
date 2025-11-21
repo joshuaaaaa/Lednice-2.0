@@ -277,6 +277,8 @@ async def async_setup_services(hass: HomeAssistant, coordinator: "LedniceDataCoo
         pin = call.data.get(ATTR_PIN)
         products = call.data.get(ATTR_PRODUCTS, [])  # List of product codes
 
+        _LOGGER.warning(f"🛒 CONSUME_PRODUCTS called with pin={pin}, products={products}")
+
         room = coord.get_room_by_pin(pin) if pin else None
         if not room:
             _LOGGER.warning(f"Invalid PIN: {pin}")
@@ -285,6 +287,8 @@ async def async_setup_services(hass: HomeAssistant, coordinator: "LedniceDataCoo
                 "pin": pin
             })
             return
+
+        _LOGGER.warning(f"🛒 Resolved PIN {pin} → room {room}")
 
         # Process each product
         success_count = 0
@@ -301,13 +305,19 @@ async def async_setup_services(hass: HomeAssistant, coordinator: "LedniceDataCoo
             item_name = product_info.get("name", f"Product {product_code}")
             price = product_info.get("price", 0.0)
 
+            _LOGGER.warning(f"🛒 Purchasing: {item_name} for room {room}, price {price}")
+
             success = await coord.remove_item(item_name, 1, room, price)
             if success:
                 success_count += 1
+                _LOGGER.warning(f"✅ Successfully added {item_name} to consumption_log for room {room}")
             else:
                 failed_products.append(product_code)
+                _LOGGER.warning(f"❌ Failed to add {item_name} - out of stock")
 
-        _LOGGER.info(f"Consumed {success_count} products for room {room}")
+        _LOGGER.warning(f"🛒 FINAL: Consumed {success_count} products for room {room}")
+        _LOGGER.warning(f"🛒 Current consumption_log has {len(coord.consumption_log)} total entries")
+
         hass.bus.async_fire(f"{DOMAIN}_products_consumed", {
             "room": room,
             "success_count": success_count,
