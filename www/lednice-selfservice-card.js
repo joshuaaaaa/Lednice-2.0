@@ -819,13 +819,24 @@ class LedniceSelfServiceCard extends HTMLElement {
     }
   }
 
-  _logout() {
+  async _logout() {
     console.warn('🚪 Logging out - clearing session');
     this._clearInactivityTimer();
     this._pin = '';
     this._cart = {};
     this._serverValidatedRoom = null;
     this._sessionTimestamp = null;
+
+    // Always turn off the guest logged in input_boolean
+    try {
+      await this._hass.callService('input_boolean', 'turn_off', {
+        entity_id: 'input_boolean.lednice_guest_logged_in'
+      });
+      console.warn('✓ Guest logged in flag turned off');
+    } catch (err) {
+      console.error('❌ Failed to turn off guest logged in flag:', err);
+    }
+
     this._render();
   }
 
