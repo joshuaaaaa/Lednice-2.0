@@ -358,7 +358,14 @@ async def async_setup_services(hass: HomeAssistant, coordinator: "LedniceDataCoo
         if is_valid and room:
             # Get guest info from Previo if available
             previo_pins = coord.data.get("previo_pins", {})
-            guest_info = previo_pins.get(room, {})
+
+            # Search for matching room AND pin in new structure (room{X}_{PIN})
+            guest_info = {}
+            for entry_key, pin_data in previo_pins.items():
+                if pin_data.get("room") == room and pin_data.get("pin") == pin:
+                    guest_info = pin_data
+                    break
+
             guest_name = guest_info.get("guest")
             checkin = guest_info.get("checkin")
             checkout = guest_info.get("checkout")
