@@ -358,13 +358,19 @@ async def async_setup_services(hass: HomeAssistant, coordinator: "LedniceDataCoo
         if is_valid and room:
             # Get guest info from Previo if available
             previo_pins = coord.data.get("previo_pins", {})
+            _LOGGER.warning(f"🔍 Looking for guest info: room={room}, pin={pin}")
+            _LOGGER.warning(f"🔍 Available previo_pins keys: {list(previo_pins.keys())}")
 
             # Search for matching room AND pin in new structure (room{X}_{PIN})
             guest_info = {}
             for entry_key, pin_data in previo_pins.items():
                 if pin_data.get("room") == room and pin_data.get("pin") == pin:
                     guest_info = pin_data
+                    _LOGGER.warning(f"✅ Found guest info in {entry_key}: {guest_info}")
                     break
+
+            if not guest_info:
+                _LOGGER.warning(f"⚠️ No Previo guest info found for room={room}, pin={pin} (this is OK for static PINs)")
 
             guest_name = guest_info.get("guest")
             checkin = guest_info.get("checkin")
@@ -410,9 +416,10 @@ async def async_setup_services(hass: HomeAssistant, coordinator: "LedniceDataCoo
                 "consumption_count": len(room_logs)
             })
 
-            _LOGGER.info(
+            _LOGGER.warning(
                 f"💰 Room {room} consumption: {total_price:.2f} Kč | "
-                f"Guest: {guest_name or 'N/A'} | Items: {len(item_summary)}"
+                f"Guest: {guest_name or 'N/A'} | Items: {len(item_summary)} | "
+                f"item_summary: {item_summary}"
             )
 
         _LOGGER.warning(f"🔔 Firing event lednice_pin_verified with data: {response}")
