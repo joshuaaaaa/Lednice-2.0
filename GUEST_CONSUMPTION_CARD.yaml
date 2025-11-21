@@ -1,72 +1,97 @@
-# ============================================
-# KARTA PRO ZOBRAZENÍ KONZUMACE HOSTA
-# ============================================
-# Tato karta zobrazuje zakoupené věci po přihlášení PINem
-# Data se automaticky vymažou při odhlášení
-
 type: vertical-stack
 cards:
-  # Hlavní karta s konzumací
   - type: markdown
     title: 🧾 Vaše Konzumace
     content: >-
       {% set logged_in = is_state('input_boolean.lednice_guest_logged_in', 'on') %}
-      {% set data_raw = states('input_text.lednice_last_pin_result') %}
+      {% set current_room = states('input_text.lednice_current_room') %}
 
-      {% if logged_in and data_raw and data_raw not in ['unknown', 'unavailable', '', 'null'] %}
-        {# Bezpečné parsování JSON - kontrola jestli je to validní JSON string #}
-        {% if data_raw[0:1] == '{' and data_raw[-1:] == '}' %}
-          {% set data = data_raw | from_json %}
+      {% if logged_in and current_room and current_room not in ['unknown', 'unavailable', '', 'null'] %}
+        {# Get consumption log from sensor.lednice_inventory attributes #}
+        {% set consumption_log = state_attr('sensor.lednice_inventory', 'consumption_log') | default([]) %}
 
-        {% if data and data.valid == true %}
-          ## 👤 {{ data.guest_name | default('Vážený hoste', true) }}
+        {# Get Previo pins for guest info #}
+        {% set previo_pins = state_attr('sensor.lednice_inventory', 'previo_pins') | default({}) %}
 
-          **🚪 Pokoj:** {{ data.room | replace('room', '') | replace('Room', '') | default('N/A', true) }}
-
-          {% if data.checkin and data.checkout %}
-          **📅 Pobyt:** {{ data.checkin[:10] }} - {{ data.checkout[:10] }}
+        {# Find guest info for current room #}
+        {% set guest_name = namespace(value='Vážený hoste') %}
+        {% set checkin = namespace(value='') %}
+        {% set checkout = namespace(value='') %}
+        {% for key, pin_data in previo_pins.items() %}
+          {% if pin_data.room == current_room %}
+            {% set guest_name.value = pin_data.guest | default('Vážený hoste') %}
+            {% set checkin.value = pin_data.checkin | default('') %}
+            {% set checkout.value = pin_data.checkout | default('') %}
           {% endif %}
+        {% endfor %}
 
-          ---
+        ## 👤 {{ guest_name.value }}
 
-          ### 🛒 Zakoupené položky:
+        **🚪 Pokoj:** {{ current_room | replace('room', '') | replace('Room', '') }}
 
-          {% if data.item_summary and data.item_summary is mapping and data.item_summary | length > 0 %}
-            | Položka | Množství | Cena/ks | Celkem |
-            |---------|----------|---------|--------|
-            {% for item_name, item_data in data.item_summary.items() %}
-            | {{ item_name }} | {{ item_data.quantity }}x | {{ item_data.unit_price | round(0) }} Kč | **{{ item_data.total_price | round(0) }} Kč** |
-            {% endfor %}
-          {% else %}
-            *Zatím jste nic nekoupili* ✅
-          {% endif %}
-
-          ---
-
-          ## 💰 Celkem k úhradě: **{{ data.total_price | default(0) | round(0) }} Kč**
-
-          *Celkem položek: {{ data.total_items | default(0) }}*
-
-          ---
-
-          {# Časovač automatického odhlášení #}
-          {% set timer = states.input_boolean.lednice_guest_logged_in %}
-          {% if timer and timer.last_changed %}
-            {% set elapsed = (now().timestamp() - timer.last_changed.timestamp()) | int %}
-            {% set remaining_seconds = 300 - elapsed %}
-            {% if remaining_seconds > 0 %}
-              {% set minutes = (remaining_seconds // 60) %}
-              {% set seconds = (remaining_seconds % 60) %}
-          *Automatické odhlášení za {{ minutes }}:{{ '%02d' | format(seconds) }}*
-            {% else %}
-          *⚠️ Relace vypršela - přihlaste se prosím znovu*
-            {% endif %}
-          {% endif %}
-
-        {% else %}
-          ## ❌ Chyba při načítání dat
-          Zkuste se prosím odhlásit a přihlásit znovu.
+        {% if checkin.value and checkout.value %}
+        **📅 Pobyt:** {{ checkin.value[:10] if checkin.value is string else checkin.value }} - {{ checkout.value[:10] if checkout.value is string else checkout.value }}
         {% endif %}
+
+        ---
+
+        ### 🛒 Zakoupené položky:
+
+        {# Filter logs for current room #}
+        {% set room_logs = consumption_log | selectattr('room', 'eq', current_room) | list %}
+
+        {# Group by item name #}
+        {% set items = namespace(summary={}) %}
+        {% for log in room_logs %}
+          {% set item_name = log.item | default('Unknown') %}
+          {% set qty = log.quantity | default(1) %}
+          {% set price = log.price | default(0) %}
+
+          {% if item_name in items.summary %}
+            {% set _ = items.summary[item_name].update({'quantity': items.summary[item_name].quantity + qty}) %}
+            {% set _ = items.summary[item_name].update({'total': items.summary[item_name].total + (price * qty)}) %}
+          {% else %}
+            {% set _ = items.summary.update({item_name: {'quantity': qty, 'price': price, 'total': price * qty}}) %}
+          {% endif %}
+        {% endfor %}
+
+        {% if items.summary | length > 0 %}
+          | Položka | Množství | Cena/ks | Celkem |
+          |---------|----------|---------|--------|
+          {% for item_name, item_data in items.summary.items() %}
+          | {{ item_name }} | {{ item_data.quantity }}x | {{ item_data.price | round(0) }} Kč | **{{ item_data.total | round(0) }} Kč** |
+          {% endfor %}
+        {% else %}
+          *Zatím jste nic nekoupili* ✅
+        {% endif %}
+
+        ---
+
+        {# Calculate total #}
+        {% set total = namespace(price=0, items=0) %}
+        {% for log in room_logs %}
+          {% set total.price = total.price + (log.price | default(0) * log.quantity | default(1)) %}
+          {% set total.items = total.items + log.quantity | default(1) %}
+        {% endfor %}
+
+        ## 💰 Celkem k úhradě: **{{ total.price | round(0) }} Kč**
+
+        *Celkem položek: {{ total.items }}*
+
+        ---
+
+        {# Časovač automatického odhlášení #}
+        {% set timer = states.input_boolean.lednice_guest_logged_in %}
+        {% if timer and timer.last_changed %}
+          {% set elapsed = (now().timestamp() - timer.last_changed.timestamp()) | int %}
+          {% set remaining_seconds = 300 - elapsed %}
+          {% if remaining_seconds > 0 %}
+            {% set minutes = (remaining_seconds // 60) %}
+            {% set seconds = (remaining_seconds % 60) %}
+        *Automatické odhlášení za {{ minutes }}:{{ '%02d' | format(seconds) }}*
+          {% else %}
+        *⚠️ Relace vypršela - přihlaste se prosím znovu*
+          {% endif %}
         {% endif %}
 
       {% elif logged_in %}
@@ -85,7 +110,7 @@ cards:
 
         ---
 
-        *PIN najdete na kartě ve vašem pokoji*
+        *Děkujeme za nákup a přejeme krásný den*
       {% endif %}
 
   # Tlačítko pro odhlášení - zobrazí se pouze když je někdo přihlášen
@@ -104,22 +129,3 @@ cards:
       show_icon: true
       hold_action:
         action: none
-
-# ============================================
-# POZNÁMKY K POUŽITÍ
-# ============================================
-#
-# 1. Ujistěte se, že máte v configuration.yaml:
-#    homeassistant:
-#      packages: !include_dir_named packages
-#
-# 2. Soubor zamek2.yaml uložte do /config/packages/zamek2.yaml
-#
-# 3. Restartujte Home Assistant
-#
-# 4. Přidejte tuto kartu do vašeho dashboardu
-#
-# 5. Pro testování:
-#    - Přihlaste se pomocí PINu v lednice-selfservice-card.js
-#    - Měli byste vidět své zakoupené položky
-#    - Po odhlášení by se měla karta vyprázdnit
