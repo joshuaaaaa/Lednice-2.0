@@ -544,6 +544,15 @@
 
                 const inventoryData = await inventoryResponse.json();
 
+                console.log('📦 Inventory data:', inventoryData);
+                console.log('📦 Inventory attributes:', inventoryData.attributes);
+                console.log('📦 Previo pins:', inventoryData.attributes.previo_pins);
+
+                // Get Previo pins from inventory sensor attributes
+                const previoPins = inventoryData.attributes.previo_pins || {};
+                console.log('📌 Loaded Previo pins:', Object.keys(previoPins).length, 'rooms');
+
+                // Get room consumption data
                 const roomConsumption = {};
                 for (let i = 1; i <= 10; i++) {
                     const roomSensorId = `sensor.lednice_room${i}_consumption`;
@@ -560,7 +569,9 @@
 
                         if (roomResponse.ok) {
                             const roomData = await roomResponse.json();
-                            roomConsumption[`room${i}`] = roomData.attributes.total_price || 0;
+                            const roomKey = `room${i}`;
+                            roomConsumption[roomKey] = roomData.attributes.total_price || 0;
+                            console.log(`💰 ${roomKey}: ${roomConsumption[roomKey]} Kč`);
                         }
                     } catch (err) {
                         console.warn(`Failed to fetch ${roomSensorId}:`, err);
@@ -568,7 +579,7 @@
                 }
 
                 return {
-                    previo_pins: inventoryData.attributes.previo_pins || {},
+                    previo_pins: previoPins,
                     roomConsumption
                 };
 
@@ -593,18 +604,42 @@
         }
 
         function isActiveToday(checkin, checkout) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
+            const now = new Date();
 
             try {
-                const checkinDate = new Date(checkin);
-                const checkoutDate = new Date(checkout);
+                // Parse dates - handle both ISO strings and "November 21, 2025 at 08:00:00 PM" format
+                let checkinDate, checkoutDate;
 
-                checkinDate.setHours(0, 0, 0, 0);
-                checkoutDate.setHours(0, 0, 0, 0);
+                if (typeof checkin === 'string') {
+                    // Try ISO format first
+                    checkinDate = new Date(checkin);
+                    // If invalid, try parsing the Previo format
+                    if (isNaN(checkinDate.getTime())) {
+                        // Remove "at" and parse
+                        const cleanCheckin = checkin.replace(' at ', ' ');
+                        checkinDate = new Date(cleanCheckin);
+                    }
+                } else {
+                    checkinDate = new Date(checkin);
+                }
 
-                return today >= checkinDate && today <= checkoutDate;
-            } catch {
+                if (typeof checkout === 'string') {
+                    checkoutDate = new Date(checkout);
+                    if (isNaN(checkoutDate.getTime())) {
+                        const cleanCheckout = checkout.replace(' at ', ' ');
+                        checkoutDate = new Date(cleanCheckout);
+                    }
+                } else {
+                    checkoutDate = new Date(checkout);
+                }
+
+                // Check if current time is between checkin and checkout
+                const isActive = now >= checkinDate && now <= checkoutDate;
+                console.log(`🕒 Active check: ${checkinDate.toISOString()} <= ${now.toISOString()} <= ${checkoutDate.toISOString()} = ${isActive}`);
+
+                return isActive;
+            } catch (err) {
+                console.error('Error parsing dates:', err, {checkin, checkout});
                 return false;
             }
         }
