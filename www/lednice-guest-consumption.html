@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lednice - Moje Konzumace</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        /* PIN Screen */
+        .pin-screen {
+            display: block;
+        }
+
+        .pin-screen.hidden {
+            display: none;
+        }
+
+        .pin-input-group {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .pin-display {
+            font-size: 48px;
+            letter-spacing: 20px;
+            padding: 20px;
+            border: 3px solid #667eea;
+            border-radius: 15px;
+            text-align: center;
+            width: 300px;
+            margin: 0 auto 30px;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .pin-keypad {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            gap: 15px;
+            justify-content: center;
+            margin: 20px auto;
+        }
+
+        .pin-button {
+            height: 80px;
+            font-size: 28px;
+            border: 3px solid #667eea;
+            border-radius: 15px;
+            background: white;
+            color: #667eea;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: bold;
+        }
+
+        .pin-button:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .pin-button:active {
+            transform: translateY(0);
+        }
+
+        .pin-button.wide {
+            grid-column: span 2;
+        }
+
+        .pin-button.clear {
+            background: #ff4757;
+            color: white;
+            border-color: #ff4757;
+        }
+
+        .pin-button.clear:hover {
+            background: #ee5a6f;
+        }
+
+        .pin-button.enter {
+            background: #5cb85c;
+            color: white;
+            border-color: #5cb85c;
+        }
+
+        .pin-button.enter:hover {
+            background: #4cae4c;
+        }
+
+        .error-message {
+            color: #ff4757;
+            text-align: center;
+            margin-top: 20px;
+            font-weight: bold;
+            min-height: 24px;
+        }
+
+        /* Consumption Screen */
+        .consumption-screen {
+            display: none;
+        }
+
+        .consumption-screen.active {
+            display: block;
+        }
+
+        .user-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+
+        .user-name {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .user-info {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            color: #667eea;
+            margin: 30px 0 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .items-table th {
+            background: #f5f5f5;
+            padding: 15px;
+            text-align: left;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .items-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .items-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .item-name {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .item-quantity {
+            color: #666;
+        }
+
+        .item-price {
+            font-weight: bold;
+            color: #5cb85c;
+        }
+
+        .total-section {
+            background: #f5f5f5;
+            padding: 25px;
+            border-radius: 15px;
+            margin: 30px 0;
+            text-align: center;
+        }
+
+        .total-label {
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .total-amount {
+            font-size: 3em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .empty-cart {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+            font-size: 1.2em;
+        }
+
+        .empty-cart-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .logout-button {
+            width: 100%;
+            padding: 20px;
+            font-size: 1.3em;
+            background: #ff4757;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .logout-button:hover {
+            background: #ee5a6f;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 71, 87, 0.3);
+        }
+
+        .logout-button:active {
+            transform: translateY(0);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 1.2em;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .timer {
+            text-align: center;
+            color: #666;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧾 Moje Konzumace</h1>
+        <div class="subtitle">Samoobslužná lednice - přehled nákupů</div>
+
+        <!-- PIN Screen -->
+        <div class="pin-screen" id="pinScreen">
+            <p style="text-align: center; color: #666; margin-bottom: 20px;">
+                Zadejte PIN kód z vašeho pokoje
+            </p>
+
+            <div class="pin-display" id="pinDisplay">••••</div>
+
+            <div class="pin-keypad">
+                <button class="pin-button" onclick="addPin('1')">1</button>
+                <button class="pin-button" onclick="addPin('2')">2</button>
+                <button class="pin-button" onclick="addPin('3')">3</button>
+                <button class="pin-button" onclick="addPin('4')">4</button>
+                <button class="pin-button" onclick="addPin('5')">5</button>
+                <button class="pin-button" onclick="addPin('6')">6</button>
+                <button class="pin-button" onclick="addPin('7')">7</button>
+                <button class="pin-button" onclick="addPin('8')">8</button>
+                <button class="pin-button" onclick="addPin('9')">9</button>
+                <button class="pin-button clear" onclick="clearPin()">C</button>
+                <button class="pin-button" onclick="addPin('0')">0</button>
+                <button class="pin-button enter" onclick="verifyPin()">✓</button>
+            </div>
+
+            <div class="error-message" id="errorMsg"></div>
+        </div>
+
+        <!-- Consumption Screen -->
+        <div class="consumption-screen" id="consumptionScreen">
+            <div class="user-header">
+                <div class="user-name" id="guestName">👤 Host</div>
+                <div class="user-info">
+                    <div>🚪 Pokoj: <span id="roomNumber">-</span></div>
+                    <div id="stayDates"></div>
+                </div>
+            </div>
+
+            <div class="section-title">🛒 Zakoupené položky</div>
+
+            <div id="itemsContainer">
+                <div class="empty-cart">
+                    <div class="empty-cart-icon">✅</div>
+                    <div>Zatím jste nic nekoupili</div>
+                </div>
+            </div>
+
+            <div class="total-section">
+                <div class="total-label">💰 Celkem k úhradě:</div>
+                <div class="total-amount" id="totalPrice">0 Kč</div>
+                <div style="color: #666; margin-top: 10px;">
+                    Celkem položek: <span id="totalItems">0</span>
+                </div>
+            </div>
+
+            <div class="timer" id="timer">
+                Automatické odhlášení za 5:00
+            </div>
+
+            <button class="logout-button" onclick="logout()">
+                🚪 Odhlásit se
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Get Home Assistant URL and token from URL parameters or localStorage
+        const urlParams = new URLSearchParams(window.location.search);
+        const HA_URL = window.location.origin;
+        const TOKEN = urlParams.get('token') || localStorage.getItem('ha_token');
+
+        if (!TOKEN) {
+            alert('⚠️ Chybí přístupový token!\n\nPřidejte ?token=YOUR_TOKEN do URL nebo nastavte token v localStorage.');
+        }
+
+        let currentPin = '';
+        let logoutTimer = null;
+        let timerInterval = null;
+
+        function addPin(digit) {
+            if (currentPin.length < 4) {
+                currentPin += digit;
+                updatePinDisplay();
+            }
+        }
+
+        function clearPin() {
+            currentPin = '';
+            updatePinDisplay();
+            document.getElementById('errorMsg').textContent = '';
+        }
+
+        function updatePinDisplay() {
+            const display = document.getElementById('pinDisplay');
+            display.textContent = '•'.repeat(currentPin.length) + '○'.repeat(4 - currentPin.length);
+        }
+
+        async function verifyPin() {
+            if (currentPin.length !== 4) {
+                showError('Zadejte 4-ciferný PIN');
+                return;
+            }
+
+            document.getElementById('errorMsg').textContent = '⏳ Ověřuji...';
+            document.getElementById('errorMsg').style.color = '#667eea';
+
+            try {
+                const response = await fetch(`${HA_URL}/api/services/lednice/verify_pin`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        pin: currentPin
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Chyba při komunikaci se serverem');
+                }
+
+                const result = await response.json();
+                console.log('Verify PIN response:', result);
+
+                if (result.valid) {
+                    showConsumption(result);
+                    startLogoutTimer();
+                } else {
+                    showError('❌ Neplatný PIN');
+                    clearPin();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Chyba při ověřování: ' + error.message);
+            }
+        }
+
+        function showConsumption(data) {
+            document.getElementById('pinScreen').classList.add('hidden');
+            document.getElementById('consumptionScreen').classList.add('active');
+
+            // Set guest info
+            document.getElementById('guestName').textContent = '👤 ' + (data.guest_name || 'Vážený hoste');
+            document.getElementById('roomNumber').textContent = (data.room || '').replace('room', '');
+
+            if (data.checkin && data.checkout) {
+                const checkin = data.checkin.substring(0, 10);
+                const checkout = data.checkout.substring(0, 10);
+                document.getElementById('stayDates').innerHTML = `📅 Pobyt: ${checkin} - ${checkout}`;
+                document.getElementById('stayDates').style.display = 'block';
+            } else {
+                document.getElementById('stayDates').style.display = 'none';
+            }
+
+            // Set items
+            const itemsContainer = document.getElementById('itemsContainer');
+
+            if (data.item_summary && Object.keys(data.item_summary).length > 0) {
+                let tableHTML = '<table class="items-table"><thead><tr>';
+                tableHTML += '<th>Položka</th><th>Množství</th><th>Cena/ks</th><th>Celkem</th>';
+                tableHTML += '</tr></thead><tbody>';
+
+                for (const [itemName, itemData] of Object.entries(data.item_summary)) {
+                    tableHTML += '<tr>';
+                    tableHTML += `<td class="item-name">${itemName}</td>`;
+                    tableHTML += `<td class="item-quantity">${itemData.quantity}x</td>`;
+                    tableHTML += `<td>${Math.round(itemData.unit_price)} Kč</td>`;
+                    tableHTML += `<td class="item-price">${Math.round(itemData.total_price)} Kč</td>`;
+                    tableHTML += '</tr>';
+                }
+
+                tableHTML += '</tbody></table>';
+                itemsContainer.innerHTML = tableHTML;
+            } else {
+                itemsContainer.innerHTML = `
+                    <div class="empty-cart">
+                        <div class="empty-cart-icon">✅</div>
+                        <div>Zatím jste nic nekoupili</div>
+                    </div>
+                `;
+            }
+
+            // Set totals
+            document.getElementById('totalPrice').textContent = Math.round(data.total_price || 0) + ' Kč';
+            document.getElementById('totalItems').textContent = data.total_items || 0;
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('errorMsg');
+            errorEl.textContent = message;
+            errorEl.style.color = '#ff4757';
+        }
+
+        function logout() {
+            // Clear timers
+            if (logoutTimer) {
+                clearTimeout(logoutTimer);
+                logoutTimer = null;
+            }
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+
+            // Reset UI
+            document.getElementById('consumptionScreen').classList.remove('active');
+            document.getElementById('pinScreen').classList.remove('hidden');
+            clearPin();
+        }
+
+        function startLogoutTimer() {
+            const TIMEOUT = 5 * 60 * 1000; // 5 minutes
+            let remaining = TIMEOUT;
+
+            // Clear existing timers
+            if (logoutTimer) clearTimeout(logoutTimer);
+            if (timerInterval) clearInterval(timerInterval);
+
+            // Set logout timer
+            logoutTimer = setTimeout(() => {
+                logout();
+                showError('Relace vypršela - přihlaste se znovu');
+            }, TIMEOUT);
+
+            // Update countdown display
+            timerInterval = setInterval(() => {
+                remaining -= 1000;
+                if (remaining > 0) {
+                    const minutes = Math.floor(remaining / 60000);
+                    const seconds = Math.floor((remaining % 60000) / 1000);
+                    document.getElementById('timer').textContent =
+                        `Automatické odhlášení za ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                } else {
+                    clearInterval(timerInterval);
+                }
+            }, 1000);
+        }
+
+        // Keyboard support
+        document.addEventListener('keypress', (e) => {
+            if (!document.getElementById('pinScreen').classList.contains('hidden')) {
+                if (e.key >= '0' && e.key <= '9') {
+                    addPin(e.key);
+                } else if (e.key === 'Enter') {
+                    verifyPin();
+                } else if (e.key === 'Escape' || e.key === 'c' || e.key === 'C') {
+                    clearPin();
+                }
+            }
+        });
+
+        // Initialize
+        updatePinDisplay();
+    </script>
+</body>
+</html>
