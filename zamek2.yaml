@@ -58,7 +58,7 @@ automation:
                 'item_summary': trigger.event.data.item_summary
               } | tojson
             }}
-    mode: single
+    mode: restart
 
   # Automatizace 2: Vymazat data při odhlášení
   - id: lednice_clear_data_on_logout
