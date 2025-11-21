@@ -550,6 +550,38 @@ class LedniceDataCoordinator:
         self._listeners = []
         self._previo_listeners = []
 
+    @staticmethod
+    def _parse_date(date_string: str) -> datetime | None:
+        """Parse date from various formats (ISO, Previo format, etc.)."""
+        if not date_string:
+            return None
+
+        # List of formats to try
+        formats = [
+            "%Y-%m-%d",  # 2025-11-24
+            "%Y-%m-%dT%H:%M:%S",  # 2025-11-24T10:00:00
+            "%Y-%m-%d %H:%M:%S",  # 2025-11-24 10:00:00
+            "%B %d, %Y at %I:%M:%S %p",  # November 24, 2025 at 10:00:00 AM
+            "%B %d, %Y",  # November 24, 2025
+        ]
+
+        # Try ISO format first (fastest)
+        try:
+            return datetime.fromisoformat(date_string)
+        except (ValueError, AttributeError):
+            pass
+
+        # Try other formats
+        for fmt in formats:
+            try:
+                return datetime.strptime(date_string, fmt)
+            except (ValueError, AttributeError):
+                continue
+
+        # If all fails, log warning and return None
+        _LOGGER.warning(f"Could not parse date string: {date_string}")
+        return None
+
     @property
     def inventory(self) -> dict:
         """Return inventory."""
@@ -579,24 +611,28 @@ class LedniceDataCoordinator:
         for room, pin_data in previo_pins.items():
             if pin_data.get("pin") == pin:
                 # Check validity
-                try:
-                    checkin = datetime.fromisoformat(pin_data.get("checkin", "")).date()
-                    checkout = datetime.fromisoformat(pin_data.get("checkout", "")).date()
+                checkin_dt = self._parse_date(pin_data.get("checkin", ""))
+                checkout_dt = self._parse_date(pin_data.get("checkout", ""))
 
-                    # PIN is valid if current date is between checkin and checkout (inclusive)
-                    if checkin <= current_date <= checkout:
-                        _LOGGER.info(
-                            f"🔐 Previo PIN verified: room={room}, pin={pin}, guest={pin_data.get('guest')}, "
-                            f"valid {checkin} to {checkout}"
-                        )
-                        return room
-                    else:
-                        _LOGGER.warning(
-                            f"🔐 Previo PIN expired: room={room}, pin={pin}, "
-                            f"valid {checkin} to {checkout}, current={current_date}"
-                        )
-                except (ValueError, AttributeError) as err:
-                    _LOGGER.error(f"Error parsing Previo PIN dates for room {room}: {err}")
+                if not checkin_dt or not checkout_dt:
+                    _LOGGER.warning(f"🔐 Could not parse dates for room {room}, skipping Previo PIN")
+                    continue
+
+                checkin = checkin_dt.date()
+                checkout = checkout_dt.date()
+
+                # PIN is valid if current date is between checkin and checkout (inclusive)
+                if checkin <= current_date <= checkout:
+                    _LOGGER.info(
+                        f"🔐 Previo PIN verified: room={room}, pin={pin}, guest={pin_data.get('guest')}, "
+                        f"valid {checkin} to {checkout}"
+                    )
+                    return room
+                else:
+                    _LOGGER.warning(
+                        f"🔐 Previo PIN expired: room={room}, pin={pin}, "
+                        f"valid {checkin} to {checkout}, current={current_date}"
+                    )
 
         # Fallback to static room PINs
         for room, room_pin in self.room_pins.items():
@@ -932,27 +968,27 @@ class LedniceDataCoordinator:
         expired_rooms = []
 
         for room, pin_data in self.data["previo_pins"].items():
-            try:
-                checkout_str = pin_data.get("checkout")
-                if not checkout_str:
-                    continue
+            checkout_str = pin_data.get("checkout")
+            if not checkout_str:
+                continue
 
-                # Parse checkout datetime
-                checkout_dt = datetime.fromisoformat(checkout_str)
+            # Parse checkout datetime
+            checkout_dt = self._parse_date(checkout_str)
 
-                # Check if more than 1 hour past checkout
-                time_since_checkout = current_time - checkout_dt
-                if time_since_checkout > timedelta(hours=1):
-                    expired_rooms.append(room)
-                    _LOGGER.info(
-                        f"🗑️ Removing expired Previo PIN: {room} | "
-                        f"guest={pin_data.get('guest')} | "
-                        f"checkout={checkout_str} | "
-                        f"expired {time_since_checkout.total_seconds() / 3600:.1f}h ago"
-                    )
+            if not checkout_dt:
+                _LOGGER.warning(f"Could not parse checkout date for {room}: {checkout_str}")
+                continue
 
-            except (ValueError, AttributeError) as err:
-                _LOGGER.error(f"Error parsing checkout date for {room}: {err}")
+            # Check if more than 1 hour past checkout
+            time_since_checkout = current_time - checkout_dt
+            if time_since_checkout > timedelta(hours=1):
+                expired_rooms.append(room)
+                _LOGGER.info(
+                    f"🗑️ Removing expired Previo PIN: {room} | "
+                    f"guest={pin_data.get('guest')} | "
+                    f"checkout={checkout_str} | "
+                    f"expired {time_since_checkout.total_seconds() / 3600:.1f}h ago"
+                )
 
         # Remove expired PINs
         if expired_rooms:
