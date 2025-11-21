@@ -1,0 +1,125 @@
+# ============================================
+# KARTA PRO ZOBRAZENÍ KONZUMACE HOSTA
+# ============================================
+# Tato karta zobrazuje zakoupené věci po přihlášení PINem
+# Data se automaticky vymažou při odhlášení
+
+type: vertical-stack
+cards:
+  # Hlavní karta s konzumací
+  - type: markdown
+    title: 🧾 Vaše Konzumace
+    content: >-
+      {% set logged_in = is_state('input_boolean.lednice_guest_logged_in', 'on') %}
+      {% set data_raw = states('input_text.lednice_last_pin_result') %}
+
+      {% if logged_in and data_raw and data_raw not in ['unknown', 'unavailable', '', 'null'] %}
+        {# Bezpečné parsování JSON - kontrola jestli je to validní JSON string #}
+        {% if data_raw[0:1] == '{' and data_raw[-1:] == '}' %}
+          {% set data = data_raw | from_json %}
+
+        {% if data and data.valid == true %}
+          ## 👤 {{ data.guest_name | default('Vážený hoste', true) }}
+
+          **🚪 Pokoj:** {{ data.room | replace('room', '') | replace('Room', '') | default('N/A', true) }}
+
+          {% if data.checkin and data.checkout %}
+          **📅 Pobyt:** {{ data.checkin[:10] }} - {{ data.checkout[:10] }}
+          {% endif %}
+
+          ---
+
+          ### 🛒 Zakoupené položky:
+
+          {% if data.item_summary and data.item_summary is mapping and data.item_summary | length > 0 %}
+            | Položka | Množství | Cena/ks | Celkem |
+            |---------|----------|---------|--------|
+            {% for item_name, item_data in data.item_summary.items() %}
+            | {{ item_name }} | {{ item_data.quantity }}x | {{ item_data.unit_price | round(0) }} Kč | **{{ item_data.total_price | round(0) }} Kč** |
+            {% endfor %}
+          {% else %}
+            *Zatím jste nic nekoupili* ✅
+          {% endif %}
+
+          ---
+
+          ## 💰 Celkem k úhradě: **{{ data.total_price | default(0) | round(0) }} Kč**
+
+          *Celkem položek: {{ data.total_items | default(0) }}*
+
+          ---
+
+          {# Časovač automatického odhlášení #}
+          {% set timer = states.input_boolean.lednice_guest_logged_in %}
+          {% if timer and timer.last_changed %}
+            {% set elapsed = (now().timestamp() - timer.last_changed.timestamp()) | int %}
+            {% set remaining_seconds = 300 - elapsed %}
+            {% if remaining_seconds > 0 %}
+              {% set minutes = (remaining_seconds // 60) %}
+              {% set seconds = (remaining_seconds % 60) %}
+          *Automatické odhlášení za {{ minutes }}:{{ '%02d' | format(seconds) }}*
+            {% else %}
+          *⚠️ Relace vypršela - přihlaste se prosím znovu*
+            {% endif %}
+          {% endif %}
+
+        {% else %}
+          ## ❌ Chyba při načítání dat
+          Zkuste se prosím odhlásit a přihlásit znovu.
+        {% endif %}
+        {% endif %}
+
+      {% elif logged_in %}
+        ## ⏳ Načítání...
+        Čekám na data z backendu.
+
+      {% else %}
+        ## 🔐 Nejste přihlášen(a)
+
+        Pro zobrazení vaší konzumace se prosím přihlaste pomocí **PINu vašeho pokoje**.
+
+        ### Jak se přihlásit:
+        1. 🔢 Zadejte PIN na klávesnici níže
+        2. ✅ Systém zobrazí vaše zakoupené položky
+        3. 💰 Uvidíte celkovou částku k úhradě
+
+        ---
+
+        *PIN najdete na kartě ve vašem pokoji*
+      {% endif %}
+
+  # Tlačítko pro odhlášení - zobrazí se pouze když je někdo přihlášen
+  - type: conditional
+    conditions:
+      - entity: input_boolean.lednice_guest_logged_in
+        state: "on"
+    card:
+      type: entity-button
+      entity: input_boolean.lednice_guest_logged_in
+      name: 🚪 Odhlásit se
+      icon: mdi:logout
+      tap_action:
+        action: toggle
+      show_state: false
+      show_icon: true
+      hold_action:
+        action: none
+
+# ============================================
+# POZNÁMKY K POUŽITÍ
+# ============================================
+#
+# 1. Ujistěte se, že máte v configuration.yaml:
+#    homeassistant:
+#      packages: !include_dir_named packages
+#
+# 2. Soubor zamek2.yaml uložte do /config/packages/zamek2.yaml
+#
+# 3. Restartujte Home Assistant
+#
+# 4. Přidejte tuto kartu do vašeho dashboardu
+#
+# 5. Pro testování:
+#    - Přihlaste se pomocí PINu v lednice-selfservice-card.js
+#    - Měli byste vidět své zakoupené položky
+#    - Po odhlášení by se měla karta vyprázdnit
