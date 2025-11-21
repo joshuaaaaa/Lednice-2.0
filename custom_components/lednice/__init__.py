@@ -622,68 +622,34 @@ class LedniceDataCoordinator:
         _LOGGER.warning(f"🔍 Current time: {current_time}")
         _LOGGER.warning(f"🔍 Available Previo PINs: {[(room, data.get('pin')) for room, data in previo_pins.items()]}")
 
-        # Also check input_text.previo_used_pins_simple_X entities as fallback
+        # First: Check if PIN matches directly in previo_pins
+        for room, pin_data in previo_pins.items():
+            stored_pin = pin_data.get("pin")
+
+            if stored_pin == pin:
+                _LOGGER.warning(f"🔍 PIN MATCH FOUND in previo_pins: {room} has PIN '{pin}'")
+                return self._validate_previo_pin_time(room, pin, pin_data, current_time)
+
+        # Second: Check input_text.previo_used_pins_simple_X entities as fallback
+        _LOGGER.warning(f"🔍 PIN not found in previo_pins, checking input_text entities...")
         for room_num in range(1, 11):
             input_text_entity = f"input_text.previo_used_pins_simple_{room_num}"
             state = self.hass.states.get(input_text_entity)
             if state and state.state and state.state == pin:
                 room_key = f"room{room_num}"
                 _LOGGER.warning(f"✅ PIN found in {input_text_entity}, matched to {room_key}")
-                # If found in input_text, check if we also have it in previo_pins with valid dates
+
+                # If found in input_text, check if we also have Previo data for this room
                 if room_key in previo_pins:
-                    _LOGGER.warning(f"🔍 Found matching Previo reservation for {room_key}, will validate time")
-                    # Continue to normal validation below
-                    break
+                    _LOGGER.warning(f"🔍 Found matching Previo reservation for {room_key}, validating time")
+                    pin_data = previo_pins[room_key]
+                    return self._validate_previo_pin_time(room_key, pin, pin_data, current_time)
                 else:
                     # No Previo data, accept PIN from input_text without time validation
                     _LOGGER.warning(f"✅ Accepting PIN from input_text (no time validation)")
                     return room_key
 
-        for room, pin_data in previo_pins.items():
-            stored_pin = pin_data.get("pin")
-
-            if stored_pin == pin:
-                _LOGGER.warning(f"🔍 PIN MATCH FOUND: {room} has PIN '{pin}'")
-
-                # Check validity with TIME (not just date)
-                checkin_str = pin_data.get("checkin", "")
-                checkout_str = pin_data.get("checkout", "")
-
-                _LOGGER.warning(f"🔍 RAW DATES: checkin_str='{checkin_str}', checkout_str='{checkout_str}'")
-
-                checkin_dt = self._parse_date(checkin_str)
-                checkout_dt = self._parse_date(checkout_str)
-
-                _LOGGER.warning(f"🔍 PARSED DATES: checkin_dt={checkin_dt}, checkout_dt={checkout_dt}")
-
-                if not checkin_dt or not checkout_dt:
-                    _LOGGER.warning(f"❌ Could not parse dates for room {room}, skipping Previo PIN")
-                    _LOGGER.warning(f"❌ Failed to parse: checkin='{checkin_str}' or checkout='{checkout_str}'")
-                    continue
-
-                _LOGGER.warning(
-                    f"🔍 TIME CHECK: checkin={checkin_dt}, checkout={checkout_dt}, current={current_time}"
-                )
-                _LOGGER.warning(f"🔍 COMPARISON: {checkin_dt} <= {current_time} <= {checkout_dt}?")
-
-                # PIN is valid if current time is between checkin and checkout (inclusive)
-                if checkin_dt <= current_time <= checkout_dt:
-                    _LOGGER.warning(
-                        f"✅ Previo PIN VERIFIED: room={room}, pin={pin}, guest={pin_data.get('guest')}, "
-                        f"valid from {checkin_dt} to {checkout_dt}"
-                    )
-                    return room
-                else:
-                    _LOGGER.warning(
-                        f"❌ Previo PIN TIME MISMATCH: room={room}, pin={pin}, "
-                        f"valid from {checkin_dt} to {checkout_dt}, current={current_time}"
-                    )
-                    if current_time < checkin_dt:
-                        _LOGGER.warning(f"❌ Too early - checkin not reached yet!")
-                    if current_time > checkout_dt:
-                        _LOGGER.warning(f"❌ Too late - checkout time passed!")
-
-        # Fallback to static room PINs
+        # Third: Fallback to static room PINs
         _LOGGER.warning(f"🔍 Checking static PINs: {dict(self.room_pins)}")
         for room, room_pin in self.room_pins.items():
             if room_pin == pin:
@@ -692,6 +658,46 @@ class LedniceDataCoordinator:
 
         _LOGGER.warning(f"❌ PIN '{pin}' not found in any Previo or static PINs")
         return None
+
+    def _validate_previo_pin_time(self, room: str, pin: str, pin_data: dict, current_time: datetime) -> str | None:
+        """Validate if Previo PIN is within valid time range."""
+        checkin_str = pin_data.get("checkin", "")
+        checkout_str = pin_data.get("checkout", "")
+
+        _LOGGER.warning(f"🔍 RAW DATES for {room}: checkin_str='{checkin_str}', checkout_str='{checkout_str}'")
+
+        checkin_dt = self._parse_date(checkin_str)
+        checkout_dt = self._parse_date(checkout_str)
+
+        _LOGGER.warning(f"🔍 PARSED DATES for {room}: checkin_dt={checkin_dt}, checkout_dt={checkout_dt}")
+
+        if not checkin_dt or not checkout_dt:
+            _LOGGER.warning(f"❌ Could not parse dates for room {room}, rejecting PIN")
+            _LOGGER.warning(f"❌ Failed to parse: checkin='{checkin_str}' or checkout='{checkout_str}'")
+            return None
+
+        _LOGGER.warning(
+            f"🔍 TIME CHECK for {room}: checkin={checkin_dt}, checkout={checkout_dt}, current={current_time}"
+        )
+        _LOGGER.warning(f"🔍 COMPARISON: {checkin_dt} <= {current_time} <= {checkout_dt}?")
+
+        # PIN is valid if current time is between checkin and checkout (inclusive)
+        if checkin_dt <= current_time <= checkout_dt:
+            _LOGGER.warning(
+                f"✅ Previo PIN VERIFIED: room={room}, pin={pin}, guest={pin_data.get('guest')}, "
+                f"valid from {checkin_dt} to {checkout_dt}"
+            )
+            return room
+        else:
+            _LOGGER.warning(
+                f"❌ Previo PIN TIME MISMATCH: room={room}, pin={pin}, "
+                f"valid from {checkin_dt} to {checkout_dt}, current={current_time}"
+            )
+            if current_time < checkin_dt:
+                _LOGGER.warning(f"❌ Too early - checkin not reached yet!")
+            if current_time > checkout_dt:
+                _LOGGER.warning(f"❌ Too late - checkout time passed!")
+            return None
 
     def get_item_by_code(self, code: str) -> str | None:
         """Get item name by barcode."""
