@@ -892,49 +892,79 @@ class LedniceDataCoordinator:
 
     async def _extract_all_previo_pins(self) -> None:
         """Extract PINs from all current Previo sensors."""
-        _LOGGER.info("🔍 Extracting PINs from all Previo sensors...")
+        _LOGGER.warning("🔍 Extracting PINs from all Previo sensors...")
+        _LOGGER.warning(f"🔍 Looking for sensors starting with: sensor.{PREVIO_DOMAIN}")
 
         # Get all sensor entities
+        all_sensors = self.hass.states.async_all("sensor")
+        _LOGGER.warning(f"🔍 Total sensors in system: {len(list(all_sensors))}")
+
+        previo_sensors = []
         for state in self.hass.states.async_all("sensor"):
             if state.entity_id.startswith(f"sensor.{PREVIO_DOMAIN}"):
+                previo_sensors.append(state.entity_id)
+                _LOGGER.warning(f"🔍 Found Previo sensor: {state.entity_id}")
                 await self._extract_previo_pins_from_sensor(state.entity_id, state)
+
+        if not previo_sensors:
+            _LOGGER.warning(f"⚠️ No Previo sensors found! Looking for: sensor.{PREVIO_DOMAIN}_*")
+            # Show first 20 sensor names for debugging
+            sample_sensors = [s.entity_id for s in list(self.hass.states.async_all("sensor"))[:20]]
+            _LOGGER.warning(f"🔍 Sample of available sensors: {sample_sensors}")
 
         await self._save_data()
         self._notify_listeners()
 
-        _LOGGER.info(f"✅ Previo PIN extraction complete. Found {len(self.data.get('previo_pins', {}))} active reservations")
+        _LOGGER.warning(f"✅ Previo PIN extraction complete. Found {len(previo_sensors)} Previo sensors, {len(self.data.get('previo_pins', {}))} active reservations")
 
     async def _extract_previo_pins_from_sensor(self, entity_id: str, state: State) -> None:
         """Extract PINs from a single Previo sensor."""
+        _LOGGER.warning(f"🔍 Processing Previo sensor: {entity_id}")
+
         if not state or not state.attributes:
+            _LOGGER.warning(f"⚠️ Sensor {entity_id} has no state or attributes")
             return
+
+        # Show all attributes for debugging
+        _LOGGER.warning(f"🔍 Sensor {entity_id} attributes: {dict(state.attributes)}")
 
         # Get room attribute
         room_attr = state.attributes.get(PREVIO_ATTR_ROOM)
+        _LOGGER.warning(f"🔍 Room attribute: {room_attr}")
         if not room_attr:
+            _LOGGER.warning(f"⚠️ Sensor {entity_id} missing '{PREVIO_ATTR_ROOM}' attribute")
             return
 
         # Parse room number(s) - can be string like "1" or "1, 2" for multiple rooms
         room_str = str(room_attr)
         room_numbers = [r.strip() for r in room_str.split(",")]
+        _LOGGER.warning(f"🔍 Parsed room numbers: {room_numbers}")
 
         # Get card_keys attribute
         card_keys = state.attributes.get(PREVIO_ATTR_CARD_KEYS)
+        _LOGGER.warning(f"🔍 card_keys attribute: {card_keys}")
+
         if not card_keys or not isinstance(card_keys, list):
             # Try single card_key as fallback
             single_key = state.attributes.get("card_key")
+            _LOGGER.warning(f"🔍 Trying fallback card_key attribute: {single_key}")
             if single_key:
                 card_keys = [single_key]
             else:
+                _LOGGER.warning(f"⚠️ Sensor {entity_id} missing both 'card_keys' and 'card_key' attributes")
                 return
+
+        _LOGGER.warning(f"🔍 Final card_keys to use: {card_keys}")
 
         # Get checkin/checkout dates
         checkin = state.attributes.get(PREVIO_ATTR_CHECKIN)
         checkout = state.attributes.get(PREVIO_ATTR_CHECKOUT)
         guest = state.attributes.get(PREVIO_ATTR_GUEST, "Unknown")
 
+        _LOGGER.warning(f"🔍 Checkin: {checkin}, Checkout: {checkout}, Guest: {guest}")
+
         if not checkin or not checkout:
-            _LOGGER.warning(f"Previo sensor {entity_id} missing checkin/checkout dates")
+            _LOGGER.warning(f"⚠️ Previo sensor {entity_id} missing checkin/checkout dates")
             return
 
         # Map each room number (1-10) to corresponding PIN from card_keys
@@ -947,9 +977,12 @@ class LedniceDataCoordinator:
                     continue
 
                 # Get corresponding PIN (if exists)
+                _LOGGER.warning(f"🔍 Processing room {room_num} (index {i})")
                 if i < len(card_keys):
                     pin = str(card_keys[i]).strip()
+                    _LOGGER.warning(f"🔍 Extracted PIN for room {room_num}: '{pin}'")
                     if not pin:
+                        _LOGGER.warning(f"⚠️ PIN is empty for room {room_num}")
                         continue
 
                     # Store in previo_pins
@@ -962,10 +995,12 @@ class LedniceDataCoordinator:
                         "sensor": entity_id
                     }
 
-                    _LOGGER.info(
-                        f"📌 Previo PIN updated: {room_key} -> PIN={pin}, "
+                    _LOGGER.warning(
+                        f"✅ Previo PIN STORED: {room_key} -> PIN={pin}, "
                         f"guest={guest}, valid {checkin} to {checkout}"
                     )
+                else:
+                    _LOGGER.warning(f"⚠️ No card_key available for room {room_num} at index {i}")
 
             except (ValueError, IndexError) as err:
                 _LOGGER.error(f"Error processing room {room_num} from {entity_id}: {err}")
