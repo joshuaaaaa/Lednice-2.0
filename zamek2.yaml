@@ -38,9 +38,7 @@ automation:
         event_data:
           valid: true
     action:
-      - service: input_boolean.turn_on
-        target:
-          entity_id: input_boolean.lednice_guest_logged_in
+      # NEJDŘÍV nastavit data, PAK boolean - aby karta měla data připravená
       - service: input_text.set_value
         target:
           entity_id: input_text.lednice_last_pin_result
@@ -58,6 +56,9 @@ automation:
                 'item_summary': trigger.event.data.item_summary
               } | tojson
             }}
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.lednice_guest_logged_in
     mode: restart
 
   # Automatizace 2: Vymazat data při odhlášení
