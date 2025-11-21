@@ -606,11 +606,19 @@ class LedniceDataCoordinator:
         """Get room name by PIN, checking Previo pins first (with validity), then fallback to static pins."""
         # First check Previo pins with validity
         previo_pins = self.data.get("previo_pins", {})
-        current_date = datetime.now().date()
+        current_time = datetime.now()
+
+        _LOGGER.warning(f"🔍 PIN CHECK: Checking PIN '{pin}' against {len(previo_pins)} Previo reservations")
+        _LOGGER.warning(f"🔍 Current time: {current_time}")
+        _LOGGER.warning(f"🔍 Available Previo PINs: {[(room, data.get('pin')) for room, data in previo_pins.items()]}")
 
         for room, pin_data in previo_pins.items():
-            if pin_data.get("pin") == pin:
-                # Check validity
+            stored_pin = pin_data.get("pin")
+
+            if stored_pin == pin:
+                _LOGGER.warning(f"🔍 PIN MATCH FOUND: {room} has PIN '{pin}'")
+
+                # Check validity with TIME (not just date)
                 checkin_dt = self._parse_date(pin_data.get("checkin", ""))
                 checkout_dt = self._parse_date(pin_data.get("checkout", ""))
 
@@ -618,28 +626,35 @@ class LedniceDataCoordinator:
                     _LOGGER.warning(f"🔐 Could not parse dates for room {room}, skipping Previo PIN")
                     continue
 
-                checkin = checkin_dt.date()
-                checkout = checkout_dt.date()
+                _LOGGER.warning(
+                    f"🔍 TIME CHECK: checkin={checkin_dt}, checkout={checkout_dt}, current={current_time}"
+                )
 
-                # PIN is valid if current date is between checkin and checkout (inclusive)
-                if checkin <= current_date <= checkout:
-                    _LOGGER.info(
-                        f"🔐 Previo PIN verified: room={room}, pin={pin}, guest={pin_data.get('guest')}, "
-                        f"valid {checkin} to {checkout}"
+                # PIN is valid if current time is between checkin and checkout (inclusive)
+                if checkin_dt <= current_time <= checkout_dt:
+                    _LOGGER.warning(
+                        f"✅ Previo PIN VERIFIED: room={room}, pin={pin}, guest={pin_data.get('guest')}, "
+                        f"valid from {checkin_dt} to {checkout_dt}"
                     )
                     return room
                 else:
                     _LOGGER.warning(
-                        f"🔐 Previo PIN expired: room={room}, pin={pin}, "
-                        f"valid {checkin} to {checkout}, current={current_date}"
+                        f"❌ Previo PIN TIME MISMATCH: room={room}, pin={pin}, "
+                        f"valid from {checkin_dt} to {checkout_dt}, current={current_time}"
                     )
+                    if current_time < checkin_dt:
+                        _LOGGER.warning(f"❌ Too early - checkin not reached yet!")
+                    if current_time > checkout_dt:
+                        _LOGGER.warning(f"❌ Too late - checkout time passed!")
 
         # Fallback to static room PINs
+        _LOGGER.warning(f"🔍 Checking static PINs: {dict(self.room_pins)}")
         for room, room_pin in self.room_pins.items():
             if room_pin == pin:
-                _LOGGER.info(f"🔐 Static PIN verified: room={room}, pin={pin}")
+                _LOGGER.warning(f"✅ Static PIN verified: room={room}, pin={pin}")
                 return room
 
+        _LOGGER.warning(f"❌ PIN '{pin}' not found in any Previo or static PINs")
         return None
 
     def get_item_by_code(self, code: str) -> str | None:
