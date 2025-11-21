@@ -1,0 +1,81 @@
+# ============================================
+# LOVELACE KARTA - Samoobslužná lednice (OPRAVENÁ VERZE)
+# ============================================
+# Tato verze obsahuje opravy pro stabilní zobrazení
+
+type: vertical-stack
+cards:
+  - type: markdown
+    title: 🧾 Vaše Konzumace
+    content: >-
+      {% set logged_in = is_state('input_boolean.lednice_guest_logged_in', 'on') %}
+      {% set data = states('input_text.lednice_last_pin_result') %}
+
+      {% if not logged_in %}
+        ## 🔐 Zadejte PIN
+        Pro zobrazení konzumace zadejte váš PIN kód pomocí tlačítka níže.
+      {% elif data and data not in ['unknown', 'unavailable', ''] %}
+        {# Safe JSON parsing with error handling #}
+        {% set json = namespace(data=none) %}
+        {% set json.data = data | from_json if data is string else none %}
+
+        {% if json.data and json.data.valid %}
+          ## 👤 {{ json.data.guest_name | default('Host', true) }}
+          **🚪 Pokoj:** {{ json.data.room | replace('room', '') | default('N/A', true) }}
+
+          {% if json.data.checkin %}
+          **📅 Období:** {{ json.data.checkin[:10] }} - {{ json.data.checkout[:10] }}
+          {% endif %}
+
+          ---
+
+          ### 🛒 Konzumované položky:
+
+          {% if json.data.item_summary and json.data.item_summary is mapping and json.data.item_summary | length > 0 %}
+            | Položka | Množství | Cena/ks | Celkem |
+            |---------|----------|---------|--------|
+            {% for item, details in json.data.item_summary.items() %}
+            | {{ item }} | {{ details.quantity }}x | {{ details.unit_price | default(0) }} Kč | **{{ details.total_price | round(0) }} Kč** |
+            {% endfor %}
+          {% else %}
+          *Zatím žádná konzumace* ✅
+          {% endif %}
+
+          ---
+
+          ## 💰 Celkem k úhradě: **{{ json.data.total_price | round(0) }} Kč**
+
+          *Celkem položek: {{ json.data.total_items | default(0) }}*
+
+          ---
+
+          {# Safe countdown timer calculation #}
+          {% set timer_entity = states.input_boolean.lednice_guest_logged_in %}
+          {% if timer_entity and timer_entity.last_changed %}
+            {% set elapsed = (now().timestamp() - timer_entity.last_changed.timestamp()) | int %}
+            {% set remaining = (300 - elapsed) %}
+            {% if remaining > 0 %}
+          *Automatické odhlášení za {{ (remaining // 60) }} minut*
+            {% else %}
+          *Relace vypršela - přihlaste se znovu*
+            {% endif %}
+          {% endif %}
+
+        {% else %}
+          ## ❌ Neplatný PIN
+          Zadejte správný PIN pro zobrazení konzumace.
+        {% endif %}
+      {% else %}
+        ## ⏳ Připraveno
+        Čekání na přihlášení. Zadejte PIN pro zobrazení konzumace.
+      {% endif %}
+
+  # Tlačítko pro odhlášení
+  - type: entity-button
+    entity: input_boolean.lednice_guest_logged_in
+    name: 🚪 Odhlásit se
+    icon: mdi:logout
+    tap_action:
+      action: toggle
+    show_state: false
+    show_icon: true
