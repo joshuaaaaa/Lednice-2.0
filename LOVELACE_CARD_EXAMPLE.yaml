@@ -1,0 +1,127 @@
+# ============================================
+# LOVELACE KARTA - Samoobslužná lednice
+# ============================================
+# Zkopírujte tuto kartu do vašeho Lovelace dashboardu
+# Karta zobrazuje konzumaci hosta a tlačítko pro odhlášení
+
+type: vertical-stack
+cards:
+  # Karta s konzumací
+  - type: markdown
+    title: 🧾 Vaše Konzumace
+    content: |-
+      {% set logged_in = is_state('input_boolean.lednice_guest_logged_in', 'on') %}
+      {% set data = states('input_text.lednice_last_pin_result') %}
+
+      {% if not logged_in %}
+        ## 🔐 Zadejte PIN
+        Pro zobrazení konzumace zadejte váš PIN kód na klávesnici.
+      {% elif data and data != 'unknown' and data != '' %}
+        {% set json = data | from_json %}
+        {% if json.valid %}
+          ## 👤 {{ json.guest_name or 'Host' }}
+          **🚪 Pokoj:** {{ json.room.replace('room', '') }}
+
+          {% if json.checkin %}
+          **📅 Období:** {{ json.checkin[:10] }} - {{ json.checkout[:10] }}
+          {% endif %}
+
+          ---
+
+          ### 🛒 Konzumované položky:
+
+          {% if json.item_summary %}
+            | Položka | Množství | Celkem |
+            |---------|----------|--------|
+            {% for item, details in json.item_summary.items() %}
+            | {{ item }} | {{ details.quantity }}x | {{ details.total_price | round(0) }} Kč |
+            {% endfor %}
+          {% else %}
+          *Zatím žádná konzumace* ✅
+          {% endif %}
+
+          ---
+
+          ## 💰 Celkem k úhradě: **{{ json.total_price | round(0) }} Kč**
+
+          *Celkem položek: {{ json.total_items }}*
+
+        {% else %}
+          ## ❌ Neplatný PIN
+          Zadejte správný PIN pro zobrazení konzumace.
+        {% endif %}
+      {% else %}
+        ## ⏳ Načítání...
+        Čekání na data po přihlášení.
+      {% endif %}
+
+  # Tlačítko pro odhlášení
+  - type: entity-button
+    entity: input_boolean.lednice_guest_logged_in
+    name: 🚪 Odhlásit se
+    icon: mdi:logout
+    tap_action:
+      action: toggle
+    show_state: false
+    show_icon: true
+
+  # Volitelná debug karta - odkomentujte pro ladění
+  # - type: entities
+  #   title: 🔍 Debug Info
+  #   entities:
+  #     - entity: input_boolean.lednice_guest_logged_in
+  #       name: "Stav přihlášení"
+  #     - entity: input_text.lednice_current_pin
+  #       name: "Aktuální PIN"
+  #     - entity: input_text.lednice_last_pin_result
+  #       name: "Výsledek ověření"
+
+# ============================================
+# ALTERNATIVNÍ VERZE - Jednodušší karta bez tabulky
+# ============================================
+
+# type: vertical-stack
+# cards:
+#   - type: markdown
+#     title: 🧾 Vaše Konzumace
+#     content: |-
+#       {% set logged_in = is_state('input_boolean.lednice_guest_logged_in', 'on') %}
+#       {% set data = states('input_text.lednice_last_pin_result') %}
+#
+#       {% if not logged_in %}
+#         ## 🔐 Zadejte PIN
+#         Pro zobrazení konzumace zadejte váš PIN kód.
+#       {% elif data and data != '' %}
+#         {% set json = data | from_json %}
+#         {% if json.valid %}
+#           ## 👤 {{ json.guest_name }}
+#           **🚪 Pokoj {{ json.room.replace('room', '') }}**
+#
+#           {% if json.checkin %}📅 {{ json.checkin[:10] }} - {{ json.checkout[:10] }}{% endif %}
+#
+#           ---
+#
+#           {% if json.item_summary %}
+#             {% for item, details in json.item_summary.items() %}
+#           • **{{ item }}**: {{ details.quantity }}x po {{ details.unit_price }} Kč = **{{ details.total_price | round(0) }} Kč**
+#             {% endfor %}
+#           {% else %}
+#           *Zatím žádná konzumace* ✅
+#           {% endif %}
+#
+#           ---
+#
+#           ## 💰 Celkem: **{{ json.total_price | round(0) }} Kč**
+#         {% else %}
+#           ❌ **Neplatný PIN**
+#         {% endif %}
+#       {% endif %}
+#
+#   - type: button
+#     name: Odhlásit se
+#     icon: mdi:logout
+#     tap_action:
+#       action: call-service
+#       service: input_boolean.turn_off
+#       service_data:
+#         entity_id: input_boolean.lednice_guest_logged_in

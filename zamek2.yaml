@@ -1,0 +1,103 @@
+# Lednice - Kompletní konfigurace pro samoobslužnou lednici
+# Uložte tento soubor do /config/packages/zamek2.yaml
+# Poté v configuration.yaml přidejte: homeassistant: packages: !include_dir_named packages
+
+# ============================================
+# INPUT HELPERS
+# ============================================
+
+input_boolean:
+  lednice_guest_logged_in:
+    name: "Lednice - Host přihlášen"
+    icon: mdi:account-check
+    initial: false
+
+input_text:
+  lednice_current_pin:
+    name: "Lednice - Aktuální PIN"
+    initial: ""
+    max: 10
+
+  lednice_last_pin_result:
+    name: "Lednice - Výsledek ověření PIN"
+    initial: ""
+    max: 2048
+
+# ============================================
+# AUTOMATIZACE
+# ============================================
+
+automation:
+  # Automatizace 1: Nastavit přihlášení po úspěšném ověření PIN
+  - id: lednice_set_logged_in_on_pin_verified
+    alias: "Lednice - Nastavit přihlášení po PIN"
+    description: "Nastaví boolean na ON když je PIN úspěšně ověřen"
+    trigger:
+      - platform: event
+        event_type: lednice_pin_verified
+        event_data:
+          valid: true
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.lednice_guest_logged_in
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.lednice_last_pin_result
+        data:
+          value: >
+            {{
+              {
+                'valid': trigger.event.data.valid,
+                'room': trigger.event.data.room,
+                'guest_name': trigger.event.data.guest_name,
+                'checkin': trigger.event.data.checkin,
+                'checkout': trigger.event.data.checkout,
+                'total_price': trigger.event.data.total_price,
+                'total_items': trigger.event.data.total_items,
+                'item_summary': trigger.event.data.item_summary
+              } | tojson
+            }}
+    mode: single
+
+  # Automatizace 2: Vymazat data při odhlášení
+  - id: lednice_clear_data_on_logout
+    alias: "Lednice - Vymazat data při odhlášení"
+    description: "Automaticky vymaže konzumaci a PIN když se host odhlásí"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.lednice_guest_logged_in
+        to: "off"
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.lednice_last_pin_result
+        data:
+          value: ""
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.lednice_current_pin
+        data:
+          value: ""
+    mode: single
+
+  # Automatizace 3: Neúspěšné ověření PIN
+  - id: lednice_invalid_pin_notification
+    alias: "Lednice - Neplatný PIN"
+    description: "Zobrazí chybu při neplatném PIN"
+    trigger:
+      - platform: event
+        event_type: lednice_pin_verified
+        event_data:
+          valid: false
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.lednice_guest_logged_in
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.lednice_last_pin_result
+        data:
+          value: >
+            {{ {'valid': false, 'message': 'Neplatný PIN'} | tojson }}
+    mode: single
