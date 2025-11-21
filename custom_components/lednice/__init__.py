@@ -620,14 +620,16 @@ class LedniceDataCoordinator:
 
         _LOGGER.warning(f"🔍 PIN CHECK: Checking PIN '{pin}' against {len(previo_pins)} Previo reservations")
         _LOGGER.warning(f"🔍 Current time: {current_time}")
-        _LOGGER.warning(f"🔍 Available Previo PINs: {[(room, data.get('pin')) for room, data in previo_pins.items()]}")
+        _LOGGER.warning(f"🔍 Available Previo entries: {[(key, data.get('pin'), data.get('room')) for key, data in previo_pins.items()]}")
 
         # First: Check if PIN matches directly in previo_pins
-        for room, pin_data in previo_pins.items():
+        # Note: Keys are now in format "room{X}_{PIN}" to support multiple reservations per room
+        for entry_key, pin_data in previo_pins.items():
             stored_pin = pin_data.get("pin")
+            room = pin_data.get("room")
 
             if stored_pin == pin:
-                _LOGGER.warning(f"🔍 PIN MATCH FOUND in previo_pins: {room} has PIN '{pin}'")
+                _LOGGER.warning(f"🔍 PIN MATCH FOUND in previo_pins: {entry_key} has PIN '{pin}' for {room}")
                 return self._validate_previo_pin_time(room, pin, pin_data, current_time)
 
         # Second: Check input_text.previo_used_pins_simple_X entities as fallback
@@ -636,18 +638,23 @@ class LedniceDataCoordinator:
             input_text_entity = f"input_text.previo_used_pins_simple_{room_num}"
             state = self.hass.states.get(input_text_entity)
             if state and state.state and state.state == pin:
-                room_key = f"room{room_num}"
-                _LOGGER.warning(f"✅ PIN found in {input_text_entity}, matched to {room_key}")
+                room = f"room{room_num}"
+                _LOGGER.warning(f"✅ PIN found in {input_text_entity}, matched to {room}")
 
-                # If found in input_text, check if we also have Previo data for this room
-                if room_key in previo_pins:
-                    _LOGGER.warning(f"🔍 Found matching Previo reservation for {room_key}, validating time")
-                    pin_data = previo_pins[room_key]
-                    return self._validate_previo_pin_time(room_key, pin, pin_data, current_time)
+                # Search previo_pins for matching room AND pin (keys are now room{X}_{PIN})
+                matching_pin_data = None
+                for entry_key, pin_data in previo_pins.items():
+                    if pin_data.get("room") == room and pin_data.get("pin") == pin:
+                        matching_pin_data = pin_data
+                        _LOGGER.warning(f"🔍 Found matching Previo reservation: {entry_key}, validating time")
+                        break
+
+                if matching_pin_data:
+                    return self._validate_previo_pin_time(room, pin, matching_pin_data, current_time)
                 else:
                     # No Previo data, accept PIN from input_text without time validation
                     _LOGGER.warning(f"✅ Accepting PIN from input_text (no time validation)")
-                    return room_key
+                    return room
 
         # Third: Fallback to static room PINs
         _LOGGER.warning(f"🔍 Checking static PINs: {dict(self.room_pins)}")
@@ -1042,9 +1049,10 @@ class LedniceDataCoordinator:
                         _LOGGER.warning(f"⚠️ PIN is empty for room {room_num}")
                         continue
 
-                    # Store in previo_pins
-                    room_key = f"room{room_int}"
+                    # Store in previo_pins with combined key room_PIN to support multiple reservations per room
+                    room_key = f"room{room_int}_{pin}"
                     self.data["previo_pins"][room_key] = {
+                        "room": f"room{room_int}",
                         "pin": pin,
                         "checkin": checkin,
                         "checkout": checkout,
