@@ -619,16 +619,25 @@ class LedniceDataCoordinator:
                 _LOGGER.warning(f"🔍 PIN MATCH FOUND: {room} has PIN '{pin}'")
 
                 # Check validity with TIME (not just date)
-                checkin_dt = self._parse_date(pin_data.get("checkin", ""))
-                checkout_dt = self._parse_date(pin_data.get("checkout", ""))
+                checkin_str = pin_data.get("checkin", "")
+                checkout_str = pin_data.get("checkout", "")
+
+                _LOGGER.warning(f"🔍 RAW DATES: checkin_str='{checkin_str}', checkout_str='{checkout_str}'")
+
+                checkin_dt = self._parse_date(checkin_str)
+                checkout_dt = self._parse_date(checkout_str)
+
+                _LOGGER.warning(f"🔍 PARSED DATES: checkin_dt={checkin_dt}, checkout_dt={checkout_dt}")
 
                 if not checkin_dt or not checkout_dt:
-                    _LOGGER.warning(f"🔐 Could not parse dates for room {room}, skipping Previo PIN")
+                    _LOGGER.warning(f"❌ Could not parse dates for room {room}, skipping Previo PIN")
+                    _LOGGER.warning(f"❌ Failed to parse: checkin='{checkin_str}' or checkout='{checkout_str}'")
                     continue
 
                 _LOGGER.warning(
                     f"🔍 TIME CHECK: checkin={checkin_dt}, checkout={checkout_dt}, current={current_time}"
                 )
+                _LOGGER.warning(f"🔍 COMPARISON: {checkin_dt} <= {current_time} <= {checkout_dt}?")
 
                 # PIN is valid if current time is between checkin and checkout (inclusive)
                 if checkin_dt <= current_time <= checkout_dt:
