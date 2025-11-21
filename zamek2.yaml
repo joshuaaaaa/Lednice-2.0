@@ -101,3 +101,19 @@ automation:
           value: >
             {{ {'valid': false, 'message': 'Neplatný PIN'} | tojson }}
     mode: single
+
+  # Automatizace 4: Automatické odhlášení po 5 minutách
+  - id: lednice_auto_logout_after_5_minutes
+    alias: "Lednice - Automatické odhlášení po 5 minutách"
+    description: "Automaticky odhlásí hosta po 5 minutách nečinnosti"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.lednice_guest_logged_in
+        to: "on"
+        for:
+          minutes: 5
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.lednice_guest_logged_in
+    mode: restart
